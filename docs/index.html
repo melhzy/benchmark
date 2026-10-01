@@ -1,0 +1,781 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="How C++, Python, R and JavaScript use a laptop's CPU, memory and GPU, measured with one shared 18-test benchmark suite.">
+<meta property="og:title" content="Four languages, one laptop">
+<meta property="og:description" content="How C++, Python, R and JavaScript use a laptop's CPU, memory and GPU, measured with one shared 18-test benchmark suite.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://melhzy.github.io/benchmark/">
+<style>
+:root { color-scheme: light; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+</style>
+<title>Four-Language Benchmark</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,400..800&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one reading column (max 1040px); a spec-sheet header, a row of headline scores,
+   then one section per hardware area, each chart with its table underneath. */
+:root {
+  --bg: #f3f3f0;          /* page plane */
+  --surface: #fcfcfb;     /* chart cards */
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #7b7a74;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --hair: rgba(11, 11, 11, 0.10);
+  --wash: rgba(11, 11, 11, 0.045);
+  --good: #0a7f0a;
+  --c-cpp: #2a78d6; --c-py: #eb6834; --c-r: #1baf7a; --c-js: #eda100;
+  --font-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-data: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --step--1: 0.8125rem; --step-0: 1rem; --step-1: 1.25rem; --step-2: 1.6rem; --step-3: 2.4rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #9a998f;
+    --grid: #2c2c2a; --axis: #45453f; --hair: rgba(255, 255, 255, 0.10); --wash: rgba(255, 255, 255, 0.06);
+    --good: #0ca30c;
+    --c-cpp: #3987e5; --c-py: #d95926; --c-r: #199e70; --c-js: #c98500;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #9a998f;
+  --grid: #2c2c2a; --axis: #45453f; --hair: rgba(255, 255, 255, 0.10); --wash: rgba(255, 255, 255, 0.06);
+  --good: #0ca30c;
+  --c-cpp: #3987e5; --c-py: #d95926; --c-r: #199e70; --c-js: #c98500;
+  color-scheme: dark;
+}
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: var(--step-0); line-height: 1.55; }
+.page { max-width: 1040px; margin: 0 auto; padding-inline: 20px; padding-block: 40px 64px; display: grid; gap: 56px; }
+@media (max-width: 520px) { .page { padding-inline: 16px; padding-block: 24px 48px; gap: 44px; } }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; line-height: 1.12; }
+h1 { font-size: var(--step-3); font-weight: 780; font-stretch: 118%; letter-spacing: -0.01em; }
+h2 { font-size: var(--step-2); font-weight: 720; font-stretch: 112%; }
+h3 { font-size: var(--step-1); font-weight: 650; }
+p { margin: 0; max-width: 66ch; }
+a { color: var(--ink); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+a:hover { text-decoration-thickness: 2px; }
+:focus-visible { outline: 2px solid var(--ink-2); outline-offset: 2px; }
+.eyebrow { font-family: var(--font-data); font-size: var(--step--1); color: var(--ink-2); letter-spacing: 0.04em; text-transform: uppercase; }
+.mono { font-family: var(--font-data); font-size: 0.92em; }
+.lede { font-size: var(--step-1); color: var(--ink-2); line-height: 1.45; max-width: 60ch; }
+section { display: grid; gap: 18px; min-width: 0; }
+.section-head { display: grid; gap: 8px; }
+.section-head p { color: var(--ink-2); }
+
+/* header */
+header { display: grid; gap: 22px; }
+.spec { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0; border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair); }
+.spec div { padding: 12px 16px 12px 0; display: grid; gap: 2px; min-width: 0; }
+.spec dt { font-family: var(--font-data); font-size: var(--step--1); color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.spec dd { margin: 0; font-size: 0.95rem; overflow-wrap: anywhere; }
+.actions { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; }
+.button { display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px; border: 1px solid var(--ink); border-radius: 6px; text-decoration: none; font-weight: 600; background: var(--surface); }
+.button:hover { background: var(--wash); }
+.check { display: inline-flex; align-items: center; gap: 8px; color: var(--ink-2); font-size: 0.95rem; }
+.check svg { flex: none; }
+
+/* headline scores */
+.scores { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 760px) { .scores { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.score { background: var(--surface); border: 1px solid var(--hair); border-radius: 10px; padding: 16px; display: grid; gap: 6px; align-content: start; }
+.score .who { display: flex; align-items: center; gap: 8px; font-weight: 650; }
+.score .key { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+.score .ver { font-family: var(--font-data); font-size: 0.75rem; color: var(--muted); }
+.score .big { font-family: var(--font-display); font-size: 2.3rem; font-weight: 760; font-stretch: 110%; line-height: 1; margin-top: 6px; }
+.score .cap { color: var(--ink-2); font-size: 0.9rem; }
+
+/* charts */
+figure { margin: 0; background: var(--surface); border: 1px solid var(--hair); border-radius: 10px; padding: 18px 18px 12px; display: grid; gap: 10px; min-width: 0; }
+@media (max-width: 520px) { figure { padding: 14px 12px 10px; } }
+figcaption { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 18px; }
+figcaption .t { font-weight: 650; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 0.85rem; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { display: inline-block; width: 12px; height: 10px; border-radius: 2px; }
+.legend i.line { height: 2px; width: 16px; border-radius: 1px; }
+.chart { width: 100%; min-width: 0; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.note { font-size: 0.85rem; color: var(--ink-2); }
+details { font-size: 0.88rem; }
+summary { cursor: pointer; color: var(--ink-2); padding: 4px 0; width: fit-content; }
+.table-wrap { overflow-x: auto; margin-top: 6px; }
+table { border-collapse: collapse; font-variant-numeric: tabular-nums; min-width: 100%; }
+th, td { text-align: right; padding: 5px 10px; border-bottom: 1px solid var(--hair); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+th { font-weight: 600; color: var(--ink-2); }
+td.id { font-family: var(--font-data); font-size: 0.82rem; }
+.grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+@media (max-width: 380px) { .grid-2 { grid-template-columns: minmax(0, 1fr); } }
+
+/* svg text and chrome */
+svg text { font-family: var(--font-body); }
+.tick text, .axis-label { fill: var(--muted); font-size: 11px; font-family: var(--font-data); }
+.tick line, .gridline { stroke: var(--grid); stroke-width: 1; }
+.baseline { stroke: var(--axis); stroke-width: 1; }
+.ref { stroke: var(--axis); stroke-width: 1.5; }
+.ref-label { fill: var(--muted); font-size: 11px; font-family: var(--font-data); }
+.row-label { fill: var(--ink); font-size: 12.5px; font-family: var(--font-data); }
+.row-sub { fill: var(--muted); font-size: 11px; }
+.group-label { fill: var(--ink-2); font-size: 12px; font-weight: 650; letter-spacing: 0.04em; text-transform: uppercase; }
+.val { fill: var(--ink-2); font-size: 10.5px; font-family: var(--font-data); }
+.end-label { fill: var(--ink-2); font-size: 11.5px; font-family: var(--font-data); }
+.hit { fill: transparent; cursor: default; }
+.hit:hover, .hit:focus, .hit.on { fill: var(--wash); outline: none; }
+.phase-label { fill: var(--ink-2); font-size: 11px; font-family: var(--font-data); }
+.crosshair { stroke: var(--ink-2); stroke-width: 1; }
+
+/* tooltip */
+#tip { position: fixed; z-index: 10; pointer-events: none; background: var(--surface); color: var(--ink); border: 1px solid var(--hair);
+  border-radius: 8px; padding: 8px 10px; box-shadow: 0 6px 22px rgba(0, 0, 0, 0.16); font-size: 0.82rem; min-width: 160px; max-width: 300px; }
+#tip .tt { color: var(--ink-2); margin-bottom: 4px; font-family: var(--font-data); font-size: 0.78rem; }
+#tip .tr { display: grid; grid-template-columns: 14px auto 1fr; align-items: center; gap: 2px 8px; }
+#tip .tr i { height: 2px; border-radius: 1px; display: block; }
+#tip .tr b { font-variant-numeric: tabular-nums; font-weight: 700; }
+#tip .tr span { color: var(--ink-2); }
+#tip .tn { color: var(--muted); font-size: 0.76rem; margin-top: 4px; }
+
+.findings { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.findings li { display: grid; grid-template-columns: 22px 1fr; gap: 10px; align-items: start; max-width: 74ch; }
+.findings li::before { content: ""; width: 10px; height: 10px; margin-top: 8px; border-radius: 2px; background: var(--k, var(--ink-2)); }
+.method { display: grid; gap: 14px; color: var(--ink-2); }
+.method p { max-width: 74ch; }
+pre { background: var(--surface); border: 1px solid var(--hair); border-radius: 8px; padding: 12px 14px; overflow-x: auto; margin: 0; font-family: var(--font-data); font-size: 0.82rem; color: var(--ink); }
+footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--muted); font-size: 0.85rem; display: flex; flex-wrap: wrap; gap: 6px 18px; }
+@media (prefers-reduced-motion: no-preference) { .hit { transition: fill 120ms ease; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <div class="eyebrow">Benchmark results · <a href="https://github.com/melhzy/benchmark">github.com/melhzy/benchmark</a></div>
+    <h1>Four languages, one laptop</h1>
+    <p class="lede">The same 18 tests, written in C++, Python, R and JavaScript, run on one machine to see how each language uses its CPU, memory and GPU.</p>
+    <dl class="spec" id="spec"></dl>
+    <div class="actions">
+      <a class="button" href="https://github.com/melhzy/benchmark">
+        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        Code and raw data on GitHub
+      </a>
+      <span class="check">
+        <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="8" fill="none" stroke="var(--good)" stroke-width="1.6"/><path d="M5.2 9.3l2.4 2.4 5-5.2" fill="none" stroke="var(--good)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        All four languages computed identical answers on all 18 tests
+      </span>
+    </div>
+  </header>
+
+  <section aria-labelledby="h-overall">
+    <div class="section-head">
+      <h2 id="h-overall">Overall speed, relative to C++</h2>
+      <p>Each test's best rate divided by C++'s rate on the same test, averaged geometrically within each hardware area, then across the four areas. 1× is as fast as C++.</p>
+    </div>
+    <div class="scores" id="scores"></div>
+    <figure>
+      <figcaption><span class="t">Score by hardware area</span><div class="legend" id="lg-cat"></div></figcaption>
+      <div class="chart" id="ch-cat"></div>
+      <details><summary>Show as a table</summary><div class="table-wrap" id="tb-cat"></div></details>
+    </figure>
+  </section>
+
+  <section aria-labelledby="h-tests">
+    <div class="section-head">
+      <h2 id="h-tests">Every test</h2>
+      <p>Speed relative to C++ on a log scale, so 0.01× and 10× fit on one axis. Hover a row for the measured rates and the spread across three full runs. Plain loops are where Python and R fall furthest behind; library calls are where they catch up.</p>
+    </div>
+    <figure>
+      <figcaption><span class="t">Speed relative to C++, per test</span><div class="legend" id="lg-tests"></div></figcaption>
+      <div class="chart" id="ch-tests"></div>
+      <details><summary>Show measured rates as a table</summary><div class="table-wrap" id="tb-tests"></div></details>
+    </figure>
+  </section>
+
+  <section aria-labelledby="h-cores">
+    <div class="section-head">
+      <h2 id="h-cores">Using all cores</h2>
+      <p>The same Mandelbrot work split across 1 to 12 workers. The CPU has 6 physical cores with two threads each; past 6 workers only C++ and JavaScript keep gaining. Python and R start separate processes, and their workers stop scaling earlier.</p>
+    </div>
+    <figure>
+      <figcaption><span class="t">Speedup over one worker</span><div class="legend" id="lg-par"></div></figcaption>
+      <div class="chart" id="ch-par"></div>
+      <details><summary>Show as a table</summary><div class="table-wrap" id="tb-par"></div></details>
+    </figure>
+  </section>
+
+  <section aria-labelledby="h-mem">
+    <div class="section-head">
+      <h2 id="h-mem">Memory</h2>
+      <p>Bandwidth against the memory's theoretical peak of 51.2 GB/s (DDR4-3200, two channels). One core reaches about half of it; R copies arrays element by element and stays near 5 GB/s.</p>
+    </div>
+    <figure>
+      <figcaption><span class="t">Memory bandwidth</span><div class="legend" id="lg-bw"></div></figcaption>
+      <div class="chart" id="ch-bw"></div>
+      <details><summary>Show as a table</summary><div class="table-wrap" id="tb-bw"></div></details>
+    </figure>
+    <div class="grid-2">
+      <figure>
+        <figcaption><span class="t">Allocate, fill and sum one big array</span></figcaption>
+        <div class="legend" id="lg-alloc"></div>
+        <div class="chart" id="ch-alloc"></div>
+        <p class="note">NumPy asks Linux for 2 MB memory pages, so it takes far fewer page faults when first touching new memory. That, not the language, is why Python wins here.</p>
+        <details><summary>Show as a table</summary><div class="table-wrap" id="tb-alloc"></div></details>
+      </figure>
+      <figure>
+        <figcaption><span class="t">Random reads from a 2 GiB array</span></figcaption>
+        <div class="chart" id="ch-gather"></div>
+        <p class="note">Nanoseconds per read; lower is better. Each read is a likely cache miss, so this mostly measures memory latency plus each language's per-element overhead.</p>
+      </figure>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-gpu">
+    <div class="section-head">
+      <h2 id="h-gpu">GPU (integrated Radeon, 7 compute units)</h2>
+      <p>C++, Python and R run identical OpenCL kernels; JavaScript runs a line-by-line WebGPU translation. Once a kernel runs, the language barely matters. Moving data does: R has no 32-bit number type and converts every value, so its uploads and downloads are about 10× slower.</p>
+    </div>
+    <div class="legend" id="lg-gpu"></div>
+    <div class="grid-2" id="gpu-grid"></div>
+  </section>
+
+  <section aria-labelledby="h-peak">
+    <div class="section-head">
+      <h2 id="h-peak">How much of the hardware each language reaches</h2>
+      <p>Best measured rate as a share of the theoretical peak. The CPU peak assumes all six cores at full boost, which this 15 W chip cannot hold; matrix multiply goes through the same OpenBLAS library in every language.</p>
+    </div>
+    <figure>
+      <figcaption><span class="t">Share of theoretical peak</span><div class="legend" id="lg-util"></div></figcaption>
+      <div class="chart" id="ch-util"></div>
+      <details><summary>Show as a table</summary><div class="table-wrap" id="tb-util"></div></details>
+    </figure>
+  </section>
+
+  <section aria-labelledby="h-heat">
+    <div class="section-head">
+      <h2 id="h-heat">Heat and clock speed during a run</h2>
+      <p>One full run, sampled every second. The CPU reaches about 100 °C within seconds of heavy work, and the average clock falls well below its 4.4 GHz peak, so all-core results are partly limited by cooling.</p>
+    </div>
+    <figure>
+      <figcaption><span class="t">CPU temperature and average clock, by language</span><span class="note" id="heat-batch"></span></figcaption>
+      <div class="chart" id="ch-heat"></div>
+    </figure>
+  </section>
+
+  <section aria-labelledby="h-find">
+    <div class="section-head"><h2 id="h-find">What the numbers say</h2></div>
+    <ul class="findings">
+      <li style="--k: var(--c-js)"><span><b>JavaScript is the surprise.</b> Node's JIT compiler runs plain loops and Mandelbrot at C++ speed and scales to 8× on 12 workers, for 0.75× of C++ overall. Deep recursion (0.13×) and GPU uploads (0.16×) are its weak spots.</span></li>
+      <li style="--k: var(--c-py)"><span><b>Python is two languages in one.</b> Plain Python runs at 1–5% of C++ speed, but NumPy matches or beats C++: sorting is 7.4× faster thanks to SIMD instructions, and big allocations 4× faster thanks to huge pages. Parallel work stops at about 5×.</span></li>
+      <li style="--k: var(--c-r)"><span><b>R is the slowest at plain code.</b> Recursion is 573× slower than C++ and R's environments make a slow hash map. Where R hands work to BLAS it matches C++, and its sort is 1.3× faster.</span></li>
+      <li style="--k: var(--c-cpp)"><span><b>C++ sets the pace</b> for plain code, memory bandwidth and GPU transfers, and scales best across cores (9.3× on 12 workers).</span></li>
+      <li><span><b>The hardware, not the language, sets the ceiling</b> for matrix math (about 225 GFLOP/s in every language through OpenBLAS) and for GPU compute (about 790 GFLOP/s, half the GPU's peak).</span></li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="h-method">
+    <div class="section-head"><h2 id="h-method">How it was measured</h2></div>
+    <div class="method">
+      <p>Each language implements the same specification: the same algorithms, the same inputs (generated from one formula, not each language's random generator) and the same output format. Loop-heavy tests use smaller sizes in Python and R, and every result is a rate (work per second), so sizes don't affect the comparison. Each test runs five times after a warm-up; the median counts. The figures above come from the newest of three full runs; the run-to-run spread is in the tooltips (typically about 1%).</p>
+      <p>Before each language, the runner waits for the CPU to cool below 60 °C. The laptop was on AC power with the balanced power profile. A verify mode runs tiny identical inputs and checks that all four languages produce the same answers; they do, to the last digit for integer results.</p>
+      <p>To add a machine, clone the repository and run:</p>
+      <pre>./run_all.sh --check     # what is installed, per language
+./run_all.sh             # about 7 minutes; results go to results/&lt;machine&gt;/</pre>
+      <p>Full definitions are in <a href="https://github.com/melhzy/benchmark/blob/main/common/SPEC.md">common/SPEC.md</a>, and the analysis notebook with more charts is <a href="https://github.com/melhzy/benchmark/blob/main/analysis.ipynb">analysis.ipynb</a>.</p>
+    </div>
+  </section>
+
+  <footer>
+    <span>Results from 1 October 2026 · Dell Inspiron 14 7425 2-in-1</span>
+    <span>MIT License · <a href="https://github.com/melhzy/benchmark">melhzy/benchmark</a></span>
+  </footer>
+</div>
+<div id="tip" hidden></div>
+
+<script id="data" type="application/json">{"langs":["C++","Python","R","JavaScript"],"categories":{"cpu_single":{"C++":1.0,"Python":0.2297335477664079,"R":0.062127980412977526,"JavaScript":0.5910708667868343},"cpu_multi":{"C++":1.0,"Python":0.11554179642120876,"R":0.09204503418082449,"JavaScript":0.9270501414182596},"ram":{"C++":1.0,"Python":1.1694030921872451,"R":0.33823919284493,"JavaScript":0.8694159225985031},"gpu":{"C++":1.0,"Python":0.9684966512075297,"R":0.38454375805871266,"JavaScript":0.6681851078306135}},"overall":{"C++":1.0,"Python":0.4163959282337517,"R":0.1651445795986598,"JavaScript":0.7511329092353383},"tests":[{"test":"scalar_loop","category":"cpu_single","style":"loop","unit":"M iter/s","rate":{"C++":506.0755,"Python":26.1249,"R":35.6396,"JavaScript":505.184},"range":{"C++":[504.2828,506.6555,3],"Python":[25.6111,26.6382,3],"R":[35.6396,37.682,3],"JavaScript":[505.184,506.5417,3]}},{"test":"mandelbrot","category":"cpu_single","style":"loop","unit":"M px/s","rate":{"C++":15.2533,"Python":0.3879,"R":0.2945,"JavaScript":15.2175},"range":{"C++":[15.1748,15.2545,3],"Python":[0.3619,0.3919,3],"R":[0.278,0.3033,3],"JavaScript":[15.2134,15.2263,3]}},{"test":"fib_recursive","category":"cpu_single","style":"loop","unit":"M calls/s","rate":{"C++":2601.897,"Python":34.8901,"R":4.5441,"JavaScript":338.525},"range":{"C++":[2578.3135,2601.897,3],"Python":[34.8534,36.8875,3],"R":[4.5441,4.6459,3],"JavaScript":[338.525,352.3819,3]}},{"test":"vector_math","category":"cpu_single","style":"vectorized","unit":"M elem/s","rate":{"C++":480.0936,"Python":318.9856,"R":118.4,"JavaScript":206.1679},"range":{"C++":[475.0046,480.0936,3],"Python":[317.9354,319.245,3],"R":[118.4,119.8897,3],"JavaScript":[206.1242,206.1955,3]}},{"test":"sort","category":"cpu_single","style":"builtin","unit":"M items/s","rate":{"C++":11.8702,"Python":87.4321,"R":16.005,"JavaScript":9.8783},"range":{"C++":[11.8702,12.0102,3],"Python":[87.4321,88.1113,3],"R":[15.6622,16.005,3],"JavaScript":[9.85,9.8938,3]}},{"test":"hashmap","category":"cpu_single","style":"builtin","unit":"M ops/s","rate":{"C++":6.8795,"Python":7.1816,"R":0.3002,"JavaScript":6.586},"range":{"C++":[6.8795,7.2448,3],"Python":[7.1816,7.4625,3],"R":[0.2963,0.3002,3],"JavaScript":[6.5323,6.7157,3]}},{"test":"string_ops","category":"cpu_single","style":"builtin","unit":"M items/s","rate":{"C++":10.651,"Python":3.9994,"R":1.1044,"JavaScript":6.0558},"range":{"C++":[10.651,11.0235,3],"Python":[3.9994,4.0725,3],"R":[1.1044,1.3205,3],"JavaScript":[6.0558,6.1509,3]}},{"test":"parallel_mandelbrot","category":"cpu_multi","style":"parallel","unit":"M px/s","rate":{"C++":140.9395,"Python":2.0589,"R":1.1672,"JavaScript":121.4452},"range":{"C++":[139.4374,142.3488,3],"Python":[2.0022,2.114,3],"R":[1.1672,1.2152,3],"JavaScript":[121.4452,131.8817,3]}},{"test":"matmul_blas","category":"cpu_multi","style":"blas","unit":"GFLOP/s","rate":{"C++":225.4113,"Python":205.9916,"R":230.612,"JavaScript":224.8198},"range":{"C++":[221.7144,227.0269,3],"Python":[205.9916,214.907,3],"R":[217.9039,230.612,3],"JavaScript":[222.3132,224.8198,2]}},{"test":"mem_copy","category":"ram","style":"builtin","unit":"GB/s","rate":{"C++":24.5059,"Python":25.6542,"R":4.8779,"JavaScript":24.6389},"range":{"C++":[24.5059,24.7928,3],"Python":[25.4185,25.6542,3],"R":[4.8779,5.1046,3],"JavaScript":[24.6334,25.0918,3]}},{"test":"mem_triad","category":"ram","style":"vectorized","unit":"GB/s","rate":{"C++":23.8079,"Python":13.8334,"R":5.1599,"JavaScript":16.345},"range":{"C++":[23.8079,24.1824,3],"Python":[13.8334,13.9348,3],"R":[5.1599,5.2784,3],"JavaScript":[16.345,16.8728,3]}},{"test":"mem_gather","category":"ram","style":"vectorized","unit":"M accesses/s","rate":{"C++":152.56,"Python":113.9687,"R":76.8335,"JavaScript":112.2537},"range":{"C++":[152.56,155.7008,3],"Python":[113.9687,116.008,3],"R":[76.5272,76.8335,3],"JavaScript":[112.056,114.4517,3]}},{"test":"mem_alloc","category":"ram","style":"builtin","unit":"GB/s","rate":{"C++":3.7144,"Python":15.2864,"R":2.2376,"JavaScript":4.1785},"range":{"C++":[3.7144,3.795,3],"Python":[15.2864,15.5037,3],"R":[2.2376,2.28,3],"JavaScript":[4.1602,4.2287,3]}},{"test":"gpu_fp32_peak","category":"gpu","style":"gpu","unit":"GFLOP/s","rate":{"C++":785.7561,"Python":774.5134,"R":763.3513,"JavaScript":798.3521},"range":{"C++":[785.7561,797.96,3],"Python":[774.5134,794.1212,3],"R":[763.3513,787.5222,3],"JavaScript":[798.1226,799.0983,3]}},{"test":"gpu_bandwidth","category":"gpu","style":"gpu","unit":"GB/s","rate":{"C++":41.1801,"Python":39.6569,"R":38.2299,"JavaScript":40.3156},"range":{"C++":[40.26,41.1801,3],"Python":[39.6569,39.9992,3],"R":[38.2299,39.2419,3],"JavaScript":[39.3153,40.9818,3]}},{"test":"gpu_sgemm","category":"gpu","style":"gpu","unit":"GFLOP/s","rate":{"C++":122.0764,"Python":127.5676,"R":118.228,"JavaScript":96.8367},"range":{"C++":[120.62,163.5511,3],"Python":[117.5317,127.5676,3],"R":[118.228,167.9723,3],"JavaScript":[96.42,98.779,3]}},{"test":"gpu_upload","category":"gpu","style":"gpu","unit":"GB/s","rate":{"C++":14.1974,"Python":15.0563,"R":1.4888,"JavaScript":2.3234},"range":{"C++":[14.1974,15.1455,3],"Python":[15.0563,15.2529,3],"R":[1.4887,1.4937,3],"JavaScript":[2.3234,2.4146,3]}},{"test":"gpu_download","category":"gpu","style":"gpu","unit":"GB/s","rate":{"C++":4.147,"Python":3.3592,"R":0.3807,"JavaScript":4.2776},"range":{"C++":[3.4309,4.5777,3],"Python":[3.3592,3.3666,3],"R":[0.3719,0.3807,3],"JavaScript":[4.0071,4.3705,3]}}],"workers":[1,2,4,6,8,12],"parallel":{"C++":[1.0,2.02,3.95,5.71,7.0,9.26],"Python":[1.0,1.93,3.65,4.87,5.06,5.36],"R":[1.0,1.83,3.21,3.74,3.81,4.0],"JavaScript":[1.0,1.99,3.91,5.56,6.72,8.01]},"parallel_rate":{"C++":[15.217,30.672,60.084,86.915,106.59,140.939],"Python":[0.384,0.74,1.401,1.873,1.945,2.059],"R":[0.292,0.535,0.938,1.092,1.113,1.167],"JavaScript":[15.163,30.219,59.247,84.238,101.865,121.445]},"triad":{"1":{"C++":21.93,"JavaScript":16.34,"Python":13.83,"R":5.16},"6":{"C++":23.81},"12":{"C++":23.47}},"alloc_sizes":[1.0,2.0,4.0,8.0,16.0],"alloc":{"C++":[3.52,3.57,3.63,3.69,3.71],"Python":[14.92,15.09,15.04,15.23,15.29],"R":[2.24,1.79,1.82,2.04,1.63],"JavaScript":[3.0,4.09,4.13,4.17,4.18]},"alloc_seconds":{"C++":[0.61,1.2,2.37,4.66,9.25],"Python":[0.14,0.28,0.57,1.13,2.25],"R":[0.96,2.4,4.72,8.44,21.06],"JavaScript":[0.72,1.05,2.08,4.12,8.22]},"peaks":{"cpu_fp64":421.4,"ram":51.2,"gpu_fp32":1612.8},"util":[{"name":"CPU compute (FP64 matrix multiply)","peak":421.4,"unit":"GFLOP/s","pct":{"C++":53.5,"Python":48.9,"R":54.7,"JavaScript":53.4}},{"name":"RAM bandwidth (copy or triad, one core)","peak":51.2,"unit":"GB/s","pct":{"C++":47.9,"Python":50.1,"R":10.1,"JavaScript":48.1}},{"name":"GPU compute (FP32 peak kernel)","peak":1612.8,"unit":"GFLOP/s","pct":{"C++":48.7,"Python":48.0,"R":47.3,"JavaScript":49.5}},{"name":"GPU memory bandwidth","peak":51.2,"unit":"GB/s","pct":{"C++":80.4,"Python":77.5,"R":74.7,"JavaScript":78.7}}],"sensors":{"batch":"20261001-135441","t":[0.0,1.0,2.0,3.1,4.1,5.1,6.1,7.2,8.2,9.2,10.2,11.2,12.3,13.3,14.3,15.3,16.3,17.4,18.4,19.4,20.4,21.5,22.5,23.5,24.5,25.5,26.6,27.6,28.6,29.6,30.6,31.7,32.7,33.7,34.7,35.7,36.8,37.8,38.8,39.8,41.0,42.1,43.1,44.2,45.2,46.3,47.3,48.6,49.6,50.7,51.7,52.7,53.7,54.7,55.8,56.8,57.8,58.8,59.8,60.9,61.9,62.9,63.9,65.0,66.0,67.0,68.0,69.0,70.1,71.1,72.1,73.1,74.2,75.2,76.2,77.2,78.2,79.3,80.3,81.3,82.3,83.3,84.4,85.4,86.4,87.4,88.4,89.5,90.5,91.5,92.5,93.6,94.6,95.6,96.6,97.6,98.7,99.7,100.7,101.7,102.7,103.8,104.8,105.8,106.8,107.9,108.9,109.9,110.9,112.0,113.0,114.0,115.0,116.0,117.1,118.1,119.1,120.1,121.1,122.2,123.3,124.3,125.4,126.6,127.7,128.7,129.7,130.8,131.8,132.8,133.8,134.9,135.9,136.9,138.0,139.0,140.0,141.0,142.1,143.1,144.1,145.2,146.2,147.2,148.2,149.3,150.3,151.3,152.3,153.4,154.4,155.4,156.5,157.5,158.5,159.5,160.6,161.6,162.6,163.6,164.7,165.7,166.7,167.7,168.7,169.8,170.8,171.8,172.8,173.9,174.9,175.9,176.9,178.0,179.0,180.0,181.0,182.0,183.1,184.1,185.1,186.1,187.1,188.2,189.2,190.2,191.2,192.2,193.3,194.3,195.3,196.3,197.4,198.4,199.4,200.4,201.4,202.5,203.5,204.5,205.5,206.5,207.6,208.6,209.6,210.6,211.7,212.7,213.7,214.7,215.7,216.8,217.8,218.8,219.8,220.9,221.9,222.9,223.9,224.9,226.0,227.0,228.0,229.0,230.1,231.1,232.1,233.1,234.2,235.3,236.4,237.5,238.5,239.5,240.5,241.6,242.6,243.6,244.6,245.7,246.7,247.7,248.7,249.7,250.8,251.8,252.8,253.8,254.9,255.9,256.9,257.9,259.0,260.0,261.0,262.0,263.1,264.1,265.1,266.1,267.2,268.2,269.2,270.2,271.2,272.3,273.3,274.3,275.3,276.4,277.4,278.4,279.4,280.4,281.5,282.5,283.5,284.5,285.5,286.6,287.6,288.6,289.6,290.6,291.7,292.7,293.7,294.7,295.8,296.8,297.8,298.8,299.9,300.9,301.9,302.9,303.9,305.0,306.0,307.0,308.0,309.0,310.1,311.1,312.1,313.1,314.1,315.2,316.2,317.2,318.2,319.2,320.3,321.3,322.3,323.3,324.4,325.4,326.4,327.4,328.5,329.5,330.5,331.5,332.5,333.6,334.6,335.6,336.6,337.6,338.7,339.7,340.7,341.7,342.8,343.8,344.8,345.8,346.9,347.9,348.9,349.9,351.0,352.0,353.0,354.0,355.1,356.1,357.1,358.1,359.1,360.2,361.2,362.2,363.2,364.3,365.3,366.3,367.3,368.3,369.4,370.4,371.4,372.4,373.5,374.5,375.5,376.5,377.5,378.6,379.6,380.6,381.6,382.6,383.7,384.7,385.7,386.7,387.7,388.8,389.8,390.8,391.8,392.9,393.9,394.9,395.9,397.0,398.1,399.2,400.3,401.4,402.4,403.4,404.5,405.5,406.5,407.5,408.6,409.6,410.6,411.6,412.7,413.7,414.7,415.7,416.7,417.8,418.8,419.8,420.8,421.8,422.9,423.9,424.9,425.9,427.0,428.0,429.0,430.0,431.0,432.1,433.1,434.1,435.1,436.2,437.2],"phase":["cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","idle","idle"],"cpu_temp":[45.2,52.9,53.9,55.0,55.4,55.9,56.8,58.6,59.6,60.5,70.1,78.0,78.6,77.6,77.2,76.9,76.8,76.4,76.8,76.9,76.6,77.5,77.4,77.2,76.0,74.9,73.9,73.1,72.4,71.5,71.1,73.0,76.9,78.8,79.4,78.4,77.6,77.5,82.6,86.5,89.1,90.6,92.0,92.9,91.9,91.2,90.0,90.2,90.5,89.8,88.6,87.5,86.9,86.2,85.8,85.0,84.8,84.2,83.8,83.0,83.0,82.5,82.0,81.5,81.1,80.8,80.2,79.5,78.6,80.6,79.2,78.2,79.2,78.6,77.2,75.0,72.8,70.8,68.8,67.0,65.4,63.8,62.5,61.4,60.1,59.2,58.1,57.1,56.2,76.1,90.5,95.8,98.2,99.1,99.4,99.4,99.5,99.8,99.9,100.0,99.9,96.8,95.0,93.8,91.6,89.8,88.2,86.8,85.2,84.0,83.1,82.0,86.8,89.2,91.0,96.0,98.5,99.4,99.1,98.5,97.2,96.2,95.1,94.4,93.4,92.1,91.0,89.9,89.0,87.4,85.8,84.2,83.9,84.4,85.8,84.9,88.1,86.0,83.9,81.9,79.8,77.2,74.8,72.5,70.2,68.2,66.4,64.6,63.0,61.5,60.1,58.9,57.8,56.6,55.8,68.5,87.9,95.4,98.1,99.2,99.6,100.0,100.0,100.2,100.2,100.2,100.4,98.4,96.4,94.5,94.8,93.8,94.6,95.2,95.0,94.8,94.1,94.8,92.6,89.8,87.0,84.2,82.4,80.1,78.2,76.6,75.6,74.5,73.5,72.9,72.2,71.5,70.9,70.8,70.2,69.8,69.6,69.8,69.1,68.8,68.8,70.6,71.9,73.1,74.1,74.0,79.4,84.0,84.5,87.0,85.2,87.5,85.9,88.0,87.2,88.0,86.6,87.1,95.4,98.2,98.1,97.5,95.9,94.4,93.5,92.4,89.5,86.8,84.9,84.5,84.5,85.2,85.6,85.8,84.4,82.9,81.5,82.4,83.1,81.6,82.1,82.4,82.8,82.8,82.2,80.9,79.4,78.1,76.9,75.8,74.8,73.9,73.0,73.0,72.6,73.0,72.2,74.8,73.5,72.9,71.9,71.1,70.4,69.6,69.4,69.4,71.2,70.6,70.2,74.1,72.9,72.2,71.5,72.5,79.5,78.1,76.4,75.5,74.8,74.1,73.1,72.8,87.6,85.4,83.0,82.4,81.5,81.4,80.8,79.8,78.9,78.0,77.2,76.0,75.5,75.0,74.6,74.1,73.9,73.5,89.0,96.0,98.5,97.5,94.4,91.5,88.8,87.5,86.4,84.0,81.6,79.6,78.9,76.9,75.5,73.9,72.6,72.2,72.6,72.2,71.8,71.5,71.9,72.1,71.9,71.2,70.6,71.5,72.5,73.5,72.9,72.2,71.1,71.5,69.4,67.2,65.4,63.6,62.0,60.5,59.1,57.9,57.0,59.8,61.1,61.5,61.9,62.1,62.2,65.6,67.2,67.8,68.1,88.4,95.8,98.4,99.4,99.9,99.5,96.0,94.1,93.6,93.1,92.8,92.4,92.1,91.8,91.5,91.2,91.2,91.0,91.1,89.9,87.9,86.1,84.6,83.0,81.9,80.6,79.8,78.6,78.0,78.0,86.5,91.2,90.0,88.6,88.1,87.8,87.2,87.0,87.4,86.4,86.6,92.6,93.6,92.2,90.4,88.6,86.9,86.2,86.2,85.8,86.4,85.9,85.5,85.1,86.4,88.5,87.9,87.2,86.8,86.2,85.8,85.2,88.5,92.6,92.4,91.4,89.6,88.6,87.5,85.8,84.4,82.8,80.4,77.6],"cpu_mhz":[3063,2122,2320,2759,2312,2553,2534,2557,2380,2734,2651,2507,2527,2661,3069,2433,2476,2581,2428,2502,3043,3394,2691,3045,2636,3210,2638,2497,3077,2654,2381,3018,2721,2517,3440,2366,2527,2935,3685,2983,2924,3014,3387,2808,2674,2733,3862,4167,3049,2690,2556,3029,2982,3456,3160,2614,2644,3023,2705,2548,3262,2750,3352,3194,2791,3131,2961,3014,2366,2432,2609,2263,3559,3088,2867,2854,2870,2382,2433,2405,2701,2816,3138,2367,2231,2322,2432,2316,2807,3301,2945,3675,2455,2659,2498,2447,3505,3393,2899,2622,2718,2892,2214,3167,3005,3045,2956,3682,2048,2241,2782,2679,2184,2907,2639,2316,3128,3096,3565,3231,3465,3035,3042,2900,2292,2679,3070,2244,2078,2306,2762,2517,2787,2510,2433,2730,1993,2027,1843,1856,1768,2305,1593,1842,1496,1692,1674,1673,1563,1587,1645,1615,1647,1661,1873,2267,2272,2603,2184,2267,2238,2625,2613,2482,2180,2579,2595,2495,2385,2703,2326,2543,3187,2087,2486,2581,2407,2312,2829,2367,2341,2253,2551,2315,2312,2336,2256,2465,2295,2317,2525,2366,2566,2421,2366,2524,2547,2698,2508,2186,2343,2566,2101,2370,2560,2107,2840,2372,2517,2538,2520,2533,2504,2309,3047,2329,2433,2653,2555,2642,2724,2451,2230,2473,2628,2160,2705,2764,2979,2982,3298,3868,2526,2082,2311,2882,2210,2333,2040,2225,2537,2472,2747,2844,2596,2174,2302,2077,2280,2120,2641,2732,2614,2740,2592,2513,2413,2579,2827,2554,2505,3040,2710,2548,2776,2741,2654,2729,2449,2554,2491,2507,2489,2474,2342,2302,2209,2276,2498,2369,2349,2307,2362,2648,2783,3616,4183,2830,3194,2532,2854,2781,2244,2169,2028,2319,2694,2351,2746,2752,3270,2649,2577,2552,2783,2379,2003,2481,2739,2475,2577,3059,2385,2330,1830,3018,2316,2657,2975,2819,2309,2541,2681,2296,2350,2324,2364,2314,2156,2299,2641,2171,2813,2095,1612,1669,1725,1614,2169,1981,1730,1732,1803,3021,2698,2917,2124,2515,2805,2611,3064,2705,2694,2682,2569,2407,2130,2630,2394,2295,2233,2438,2575,2654,2362,2532,2400,2216,2812,2294,2738,2753,2722,2839,2515,2581,2209,2376,2852,3063,3160,2311,2869,3044,2887,2733,4238,3021,2983,2923,2869,2678,3018,2428,2305,2599,2343,3003,2352,2774,3159,2828,2943,2989,2429,2783,2691,2659,3238,2520,2172,2468,2289,2314,3175,3680,3069,3018,2784,3385,2336,2995,2504,2522,2767,1824,1953],"gpu_busy":[2,3,1,2,1,2,3,2,1,2,3,1,1,2,2,3,2,0,2,1,1,2,2,4,4,5,3,3,2,3,4,4,3,2,5,2,4,2,1,1,0,3,1,3,1,0,0,2,4,3,10,4,3,2,3,2,2,2,4,3,2,3,3,3,2,3,3,3,2,4,65,69,42,25,13,6,4,3,3,3,3,2,3,2,2,2,2,2,2,4,4,4,3,3,3,2,3,3,3,2,3,3,2,2,2,2,3,2,2,2,2,2,3,2,3,3,3,4,5,5,6,5,7,6,6,4,3,3,3,4,4,3,4,4,4,3,29,58,74,37,19,7,2,2,0,0,0,0,0,0,0,0,0,0,0,2,1,0,1,2,0,2,0,1,1,2,1,2,0,1,2,1,1,1,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,2,0,0,0,0,0,0,1,1,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,2,0,2,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,1,1,1,0,2,3,1,2,1,0,0,1,1,1,0,0,0,0,0,0,1,4,6,5,4,3,3,3,3,3,3,3,3,2,2,2,3,3,3,2,2,2,2,2,24,32,37,18,11,16,19,22,24,10,5,4,2,3,4,4,3,2,3,2,2,4,2,4,4,3,2,2,2,2,1,1,1,1,3,2,2,3,2,2,4,4,4,3,4,3,3,3,3,4,3,3,3,4,3,2,2,2,2,2,2,2,1,3,2,3,3,2,2,2,3,3,3,4,4,5,5,6,7,7,7,6,6,4,3,2,4,2,3,2,2,4,3,2,2,3,2,3,3,3,2,3,2,2,2,2,1,2,3,60,50,77,49,25,17,19,7,3],"ram":[3.77,3.86,3.87,3.87,3.87,3.87,3.86,3.86,3.86,3.86,3.86,3.85,4.22,4.15,4.15,4.15,4.15,4.15,4.15,4.15,4.15,4.15,4.15,4.05,4.08,4.08,4.08,4.08,4.09,4.09,4.08,4.28,4.41,4.41,4.21,4.21,4.19,4.19,4.17,4.41,4.41,4.4,4.37,6.07,5.13,7.07,7.07,6.99,5.92,6.47,6.47,6.47,4.57,5.15,6.24,7.97,5.46,7.93,10.44,11.99,4.96,7.08,9.57,11.53,14.05,16.55,19.07,20.01,19.31,4.42,4.42,4.73,4.53,5.92,4.61,4.59,4.57,4.56,4.54,4.52,4.5,4.49,4.47,4.46,4.44,4.42,4.4,4.39,4.37,4.36,4.35,4.33,4.32,4.31,4.29,4.28,4.26,4.25,4.23,4.21,4.74,4.7,4.62,4.59,4.82,4.83,4.55,4.61,4.67,4.66,4.74,4.89,4.38,4.37,4.37,4.35,4.33,4.33,4.32,4.33,4.68,4.74,4.68,4.66,6.15,7.54,8.25,8.1,7.55,7.46,7.14,7.11,6.18,10.95,9.88,20.32,4.83,4.78,4.77,5.7,4.47,4.46,4.44,4.33,4.27,4.25,4.21,4.14,4.15,4.05,4.05,3.98,3.97,3.97,3.9,3.99,3.99,3.95,3.95,3.95,3.92,3.92,3.92,3.92,3.92,3.92,3.92,5.05,5.05,5.05,5.37,5.02,4.9,4.84,4.77,4.75,4.43,4.62,4.61,4.67,4.68,4.7,4.82,4.8,4.79,4.79,4.78,4.77,4.76,4.76,4.71,4.71,4.7,4.7,4.69,4.68,4.67,4.65,4.63,4.63,4.63,4.7,4.75,4.73,4.72,4.72,4.67,4.67,4.62,4.62,4.57,4.57,4.56,4.49,4.49,4.45,4.44,4.39,4.39,4.39,4.38,4.38,4.38,4.38,4.37,4.38,4.63,4.75,4.97,5.01,4.97,4.94,4.91,4.78,5.58,6.08,6.11,7.01,7.01,6.89,6.17,6.03,6.94,6.94,6.33,6.33,7.33,7.32,7.32,7.32,7.32,7.32,5.41,6.86,6.9,8.37,8.69,7.98,8.3,7.17,7.1,7.02,7.07,7.07,7.13,5.57,4.87,6.13,7.29,6.7,4.8,6.75,8.29,10.3,10.3,4.75,5.36,7.87,9.96,12.31,13.76,16.15,16.33,16.33,14.71,4.76,5.46,7.82,10.24,12.77,15.31,17.86,20.36,21.62,24.04,26.45,28.86,31.28,33.69,36.11,36.36,36.36,36.36,36.36,36.36,36.36,36.1,21.29,5.86,4.77,4.76,4.74,6.03,5.11,5.1,5.07,5.06,5.54,5.88,5.81,5.81,5.77,4.82,5.53,5.82,5.85,5.43,6.34,5.77,6.35,5.87,7.29,6.28,5.19,5.17,5.15,5.12,5.1,5.07,5.05,5.04,5.02,5.0,4.98,4.96,4.94,4.92,4.9,4.88,4.85,4.83,4.81,4.79,4.77,4.75,4.72,4.69,4.67,4.73,4.72,4.36,4.36,4.5,4.49,4.63,4.62,4.63,4.63,4.62,4.62,4.6,4.59,4.24,4.45,4.39,4.37,4.37,4.35,4.37,4.29,4.35,4.27,4.34,4.55,4.51,4.45,4.44,4.66,4.64,4.62,4.59,6.12,7.22,6.67,6.96,5.95,6.67,6.65,6.63,6.61,4.68,5.24,6.64,8.27,5.73,8.2,10.69,12.19,5.12,6.64,9.1,11.6,14.09,16.6,19.1,20.1,20.09,5.91,4.73,5.59,4.64,6.1,6.08,5.67,6.04,4.45,4.43]},"system":{"vendor":"Dell Inc.","product":"Inspiron 14 7425 2-in-1","cpu":"AMD Ryzen 5 5625U with Radeon Graphics","cpu_max_mhz":"4390","physical_cores":"6","logical_cpus":"12","ram_gib":"61.2","ram_type":"DDR4","ram_speed_mts":"3200","ram_modules":"2","gpus":"Advanced Micro Devices, Inc. [AMD/ATI] Barcelo (rev c2)","os":"Ubuntu 26.04.1 LTS","kernel":"7.0.0-34-generic","power":"AC","platform_profile":"balanced","ram_module_sizes_gib":"32 32"},"batches":{"20261001-132106":{"C++":74.0,"JavaScript":79.0,"Python":52.0,"R":182.0},"20261001-133954":{"C++":74.0,"JavaScript":83.0,"Python":52.0,"R":180.0},"20261001-135441":{"C++":76.0,"JavaScript":84.0,"Python":53.0,"R":182.0}},"versions":{"C++":{"version":"g++ 15.2.0","blas":"OpenBLAS 0.3.32 NO_LAPACKE DYNAMIC_ARCH NO_AFFINITY Zen MAX_","gpu":"rusticl"},"Python":{"version":"CPython 3.14.7","blas":"scipy-openblas: OpenBLAS 0.3.34.106.0  USE64BITINT DYNAMIC_A","gpu":"rusticl (OpenCL 3.0 )"},"R":{"version":"R 4.5.2","blas":"/usr/lib/x86_64-linux-gnu/openblas-pthread/libblas.so.3","gpu":"rusticl OpenCL 3.0 "},"JavaScript":{"version":"Node.js v24.21.0 (V8 13.6.233.17-node.53)","blas":"OpenBLAS 0.3.32 NO_LAPACKE DYNAMIC_ARCH NO_AFFINITY Zen MAX_","gpu":"WebGPU (npm webgpu 0.6.1, Dawn, Vulkan)"}},"newest_batch":{"C++":"20261001-135441","Python":"20261001-135441","R":"20261001-135441","JavaScript":"20261001-135441"}}</script>
+<script>
+(() => {
+  const D = JSON.parse(document.getElementById("data").textContent);
+  const LANGS = D.langs;
+  const KEY = { "C++": "cpp", "Python": "py", "R": "r", "JavaScript": "js" };
+  const col = (l) => `var(--c-${KEY[l]})`;
+  const CAT = { cpu_single: "CPU, one core", cpu_multi: "CPU, all cores", ram: "RAM", gpu: "GPU" };
+  const DESC = {
+    scalar_loop: "plain loop", mandelbrot: "Mandelbrot, plain loops", fib_recursive: "recursive calls",
+    vector_math: "math on a 50M array", sort: "sort 20M numbers", hashmap: "hash map", string_ops: "build, split, parse strings",
+    parallel_mandelbrot: "Mandelbrot, all cores", matmul_blas: "4096² matrix multiply",
+    mem_copy: "copy 1 GiB", mem_triad: "STREAM triad", mem_gather: "random reads", mem_alloc: "allocate 1–16 GiB",
+    gpu_fp32_peak: "compute peak", gpu_bandwidth: "memory copy", gpu_sgemm: "2048² matrix multiply",
+    gpu_upload: "512 MiB to GPU", gpu_download: "512 MiB from GPU",
+  };
+  const NS = "http://www.w3.org/2000/svg";
+  const nf3 = new Intl.NumberFormat("en-US", { maximumSignificantDigits: 3 });
+  const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+  const num = (v) => v == null ? "–" : (Math.abs(v) >= 1000 ? nf0.format(v) : nf3.format(v));
+  const times = (v) => v == null ? "–" : (v >= 10 ? nf0.format(v) : new Intl.NumberFormat("en-US", { maximumSignificantDigits: 2 }).format(v)) + "×";
+
+  function svgEl(tag, attrs = {}, parent) {
+    const e = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  function text(parent, x, y, str, cls, attrs = {}) {
+    const t = svgEl("text", { x, y, class: cls, ...attrs }, parent);
+    t.textContent = str;
+    return t;
+  }
+  function legend(id, langs, kind = "bar") {
+    const box = document.getElementById(id);
+    box.replaceChildren();
+    for (const l of langs) {
+      const s = document.createElement("span");
+      const i = document.createElement("i");
+      if (kind === "line") i.className = "line";
+      i.style.background = col(l);
+      s.append(i, document.createTextNode(l));
+      box.appendChild(s);
+    }
+  }
+  function table(id, head, rows, idCols = 1) {
+    const t = document.createElement("table");
+    const tr = document.createElement("tr");
+    for (const h of head) { const th = document.createElement("th"); th.textContent = h; tr.appendChild(th); }
+    const thead = document.createElement("thead"); thead.appendChild(tr); t.appendChild(thead);
+    const tb = document.createElement("tbody");
+    for (const r of rows) {
+      const row = document.createElement("tr");
+      r.forEach((c, i) => { const td = document.createElement("td"); td.textContent = c; if (i < idCols) td.className = "id"; row.appendChild(td); });
+      tb.appendChild(row);
+    }
+    t.appendChild(tb);
+    document.getElementById(id).replaceChildren(t);
+  }
+
+  // ---------------------------------------------------------------- tooltip
+  const tip = document.getElementById("tip");
+  function showTip(title, rows, note, x, y) {
+    tip.replaceChildren();
+    const tt = document.createElement("div"); tt.className = "tt"; tt.textContent = title; tip.appendChild(tt);
+    for (const r of rows) {
+      const tr = document.createElement("div"); tr.className = "tr";
+      const i = document.createElement("i"); i.style.background = r.color || "var(--ink-2)";
+      const b = document.createElement("b"); b.textContent = r.value;
+      const s = document.createElement("span"); s.textContent = r.label;
+      tr.append(i, b, s); tip.appendChild(tr);
+    }
+    if (note) { const n = document.createElement("div"); n.className = "tn"; n.textContent = note; tip.appendChild(n); }
+    tip.hidden = false;
+    const w = tip.offsetWidth, h = tip.offsetHeight;
+    let left = x + 14, top = y + 14;
+    if (left + w > window.innerWidth - 8) left = x - w - 14;
+    if (top + h > window.innerHeight - 8) top = y - h - 14;
+    tip.style.left = Math.max(8, left) + "px"; tip.style.top = Math.max(8, top) + "px";
+  }
+  const hideTip = () => { tip.hidden = true; };
+  function bindTip(node, build) {
+    node.setAttribute("tabindex", "0");
+    node.addEventListener("pointermove", (e) => { const b = build(e); showTip(b.title, b.rows, b.note, e.clientX, e.clientY); });
+    node.addEventListener("pointerleave", hideTip);
+    node.addEventListener("focus", () => { const r = node.getBoundingClientRect(); const b = build(null); showTip(b.title, b.rows, b.note, r.left + r.width / 2, r.top); });
+    node.addEventListener("blur", hideTip);
+  }
+
+  // ---------------------------------------------------------------- scales
+  function scale(kind, d0, d1, r0, r1) {
+    if (kind === "log") {
+      const a = Math.log10(d0), b = Math.log10(d1);
+      return (v) => r0 + (Math.log10(Math.max(v, d0)) - a) / (b - a) * (r1 - r0);
+    }
+    return (v) => r0 + (v - d0) / (d1 - d0) * (r1 - r0);
+  }
+  function barPath(x0, x1, y, h, r = 4) {
+    const w = x1 - x0; if (w <= 0) return "";
+    r = Math.min(r, h / 2, w);
+    return `M${x0},${y}H${x1 - r}Q${x1},${y} ${x1},${y + r}V${y + h - r}Q${x1},${y + h} ${x1 - r},${y + h}H${x0}Z`;
+  }
+
+  // ---------------------------------------------------------------- grouped horizontal bars
+  // rows: [{label, sub, header?}], series: languages, get(row, lang) -> value
+  function hbars(id, o) {
+    const box = document.getElementById(id);
+    const W = Math.max(280, box.clientWidth);
+    const narrow = W < 560;
+    const labelW = o.labelW ? o.labelW(narrow) : (narrow ? 118 : 190);
+    const right = narrow ? 52 : 70, top = 6, bottom = 30;
+    const barH = Math.min(o.barH || 9, 24), gap = 2;
+    const series = o.series;
+    const rows = o.rows;
+    let y = top;
+    const layout = rows.map((r) => {
+      if (r.header) { const at = y + (y > top ? 14 : 0); y = at + 24; return { r, y: at, header: true }; }
+      const h = series.length * (barH + gap) - gap;
+      const pad = o.rowPad ?? (narrow ? 10 : 12);
+      const sub = r.sub && !narrow ? 12 : 0;
+      const rowH = Math.max(h, sub ? 30 : 0) + pad * 2;
+      const item = { r, y, h: rowH, barsY: y + (rowH - h) / 2 };
+      y += rowH;
+      return item;
+    });
+    const H = y + bottom;
+    const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": o.aria || "" });
+    const x = scale(o.scale, o.domain[0], o.domain[1], labelW, W - right);
+    const g = svgEl("g", {}, svg);
+    for (const t of o.ticks) {
+      const tx = x(t);
+      svgEl("line", { x1: tx, x2: tx, y1: top, y2: H - bottom + 4, class: "gridline" }, g);
+      text(g, tx, H - bottom + 18, o.tickFmt(t), "tick axis-label", { "text-anchor": "middle" });
+    }
+    svgEl("line", { x1: labelW, x2: labelW, y1: top, y2: H - bottom, class: "baseline" }, g);
+    for (const ref of o.refs || []) {
+      const rx = x(ref.x);
+      svgEl("line", { x1: rx, x2: rx, y1: top, y2: H - bottom, class: "ref" }, g);
+      if (ref.label) text(g, rx - 4, H - bottom - 6, ref.label, "ref-label", { "text-anchor": "end" });
+    }
+    for (const it of layout) {
+      if (it.header) { text(g, 0, it.y + 14, it.r.label, "group-label"); continue; }
+      const hit = svgEl("rect", { x: 0, y: it.y, width: W, height: it.h, class: "hit", rx: 4 }, g);
+      const cy = it.y + it.h / 2;
+      if (it.r.sub && !narrow) {
+        text(g, 0, cy - 2, it.r.label, "row-label");
+        text(g, 0, cy + 13, it.r.sub, "row-sub");
+      } else {
+        text(g, 0, cy + 4, it.r.label, "row-label");
+      }
+      series.forEach((l, i) => {
+        const v = o.get(it.r, l);
+        const by = it.barsY + i * (barH + gap);
+        if (v == null || !(v > 0)) return;
+        const x1 = Math.max(x(v), labelW + 2);
+        svgEl("path", { d: barPath(labelW, x1, by, barH), style: `fill:${col(l)}`, "pointer-events": "none" }, g);
+        if (o.valueLabels !== false) text(g, x1 + 5, by + barH - 1, o.valFmt(v, it.r, l), "val", { "pointer-events": "none" });
+      });
+      bindTip(hit, () => o.tip(it.r));
+      hit.setAttribute("aria-label", o.ariaRow ? o.ariaRow(it.r) : it.r.label);
+    }
+    box.replaceChildren(svg);
+  }
+
+  // ---------------------------------------------------------------- line chart with crosshair
+  function lines(id, o) {
+    const box = document.getElementById(id);
+    const W = Math.max(280, box.clientWidth), H = o.height || 300;
+    const narrow = W < 520;
+    const L = 44, R = narrow ? 70 : 96, T = 10, B = 34;
+    const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": o.aria || "" });
+    const x = scale(o.xScale || "linear", o.xDomain[0], o.xDomain[1], L, W - R);
+    const y = scale("linear", o.yDomain[0], o.yDomain[1], H - B, T);
+    for (const t of o.yTicks) {
+      svgEl("line", { x1: L, x2: W - R, y1: y(t), y2: y(t), class: "gridline" }, svg);
+      text(svg, L - 8, y(t) + 4, o.yFmt(t), "tick axis-label", { "text-anchor": "end" });
+    }
+    for (const t of o.xs) text(svg, x(t), H - B + 18, o.xFmt(t), "tick axis-label", { "text-anchor": "middle" });
+    svgEl("line", { x1: L, x2: W - R, y1: H - B, y2: H - B, class: "baseline" }, svg);
+    if (o.xLabel) text(svg, (L + W - R) / 2, H - 2, o.xLabel, "axis-label", { "text-anchor": "middle" });
+    if (o.vline) {
+      svgEl("line", { x1: x(o.vline.x), x2: x(o.vline.x), y1: T, y2: H - B, class: "ref" }, svg);
+      text(svg, x(o.vline.x) + 5, T + 12, o.vline.label, "ref-label");
+    }
+    if (o.ideal) {
+      svgEl("polyline", { points: o.xs.map((t) => `${x(t)},${y(o.ideal(t))}`).join(" "), fill: "none", stroke: "var(--axis)", "stroke-width": 2, "stroke-linecap": "round" }, svg);
+      const lx = o.xs[o.xs.length - 1];
+      text(svg, x(lx) + 8, y(o.ideal(lx)) + 4, "perfect", "end-label");
+    }
+    for (const s of o.series) {
+      const pts = o.xs.map((t, i) => [x(t), y(s.values[i])]).filter((p, i) => s.values[i] != null);
+      svgEl("polyline", { points: pts.map((p) => p.join(",")).join(" "), fill: "none", style: `stroke:${col(s.lang)}`, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }, svg);
+      for (const p of pts) svgEl("circle", { cx: p[0], cy: p[1], r: 4.5, style: `fill:${col(s.lang)}`, stroke: "var(--surface)", "stroke-width": 2 }, svg);
+    }
+    // end labels; skipped where two would collide (the legend and tooltip carry identity then)
+    const ends = o.series.map((s) => ({ s, v: s.values[s.values.length - 1] })).filter((e) => e.v != null)
+      .map((e) => ({ ...e, py: y(e.v) })).sort((a, b) => a.py - b.py);
+    ends.forEach((e, i) => {
+      const clash = (i > 0 && e.py - ends[i - 1].py < 13) || (i < ends.length - 1 && ends[i + 1].py - e.py < 13);
+      if (!clash) text(svg, x(o.xs[o.xs.length - 1]) + 9, e.py + 4, o.endFmt(e.s, e.v), "end-label");
+    });
+    const cross = svgEl("line", { x1: 0, x2: 0, y1: T, y2: H - B, class: "crosshair", visibility: "hidden" }, svg);
+    const hit = svgEl("rect", { x: L, y: T, width: W - R - L, height: H - B - T, class: "hit", fill: "transparent", style: "fill:transparent" }, svg);
+    let idx = o.xs.length - 1;
+    const build = (e) => {
+      if (e) {
+        const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
+        const px = pt.matrixTransform(svg.getScreenCTM().inverse()).x;
+        idx = o.xs.reduce((best, t, i) => Math.abs(x(t) - px) < Math.abs(x(o.xs[best]) - px) ? i : best, 0);
+      }
+      cross.setAttribute("x1", x(o.xs[idx])); cross.setAttribute("x2", x(o.xs[idx])); cross.setAttribute("visibility", "visible");
+      const rows = o.series.map((s) => ({ color: col(s.lang), value: o.tipFmt(s.values[idx]), label: s.lang }))
+        .sort((a, b) => parseFloat(b.value) - parseFloat(a.value));
+      return { title: o.tipTitle(o.xs[idx]), rows, note: o.tipNote ? o.tipNote(o.xs[idx]) : "" };
+    };
+    bindTip(hit, build);
+    hit.addEventListener("pointerleave", () => cross.setAttribute("visibility", "hidden"));
+    hit.addEventListener("blur", () => cross.setAttribute("visibility", "hidden"));
+    hit.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+        idx = Math.max(0, Math.min(o.xs.length - 1, idx + (e.key === "ArrowRight" ? 1 : -1)));
+        const r = hit.getBoundingClientRect(); const b = build(null);
+        showTip(b.title, b.rows, b.note, r.left + (x(o.xs[idx]) - L) / (W - R - L) * r.width, r.top);
+        e.preventDefault();
+      }
+    });
+    hit.setAttribute("aria-label", (o.aria || "") + ". Use left and right arrow keys to read values.");
+    box.replaceChildren(svg);
+  }
+
+  // ---------------------------------------------------------------- page content
+  const S = D.system;
+  const spec = [
+    ["Machine", `${S.vendor.replace(/ Inc\.$/, "")} ${S.product}`],
+    ["CPU", `${S.cpu.replace(" with Radeon Graphics", "")} · ${S.physical_cores} cores / ${S.logical_cpus} threads · up to ${(S.cpu_max_mhz / 1000).toFixed(1)} GHz`],
+    ["Memory", `${S.ram_modules} × ${Math.round(parseFloat(S.ram_gib) / S.ram_modules / 1.0) >= 30 ? 32 : ""} GB ${S.ram_type}-${S.ram_speed_mts}, dual channel`],
+    ["GPU", "AMD Radeon Vega 7 (integrated), 7 compute units, 1.8 GHz"],
+    ["System", `${S.os} · Linux ${S.kernel.split("-")[0]}`],
+    ["Runs", `3 full runs, ${S.power} power, ${S.platform_profile} profile`],
+  ];
+  const dl = document.getElementById("spec");
+  for (const [k, v] of spec) {
+    const d = document.createElement("div"), dt = document.createElement("dt"), dd = document.createElement("dd");
+    dt.textContent = k; dd.textContent = v; d.append(dt, dd); dl.appendChild(d);
+  }
+  const VER = { "C++": "g++ 15.2, -O3", "Python": "CPython 3.14 + NumPy 2.5", "R": "R 4.5.2", "JavaScript": "Node.js 24 (V8)" };
+  const scores = document.getElementById("scores");
+  for (const l of LANGS) {
+    const c = document.createElement("div"); c.className = "score";
+    const who = document.createElement("div"); who.className = "who";
+    const k = document.createElement("span"); k.className = "key"; k.style.background = col(l);
+    who.append(k, document.createTextNode(l));
+    const ver = document.createElement("div"); ver.className = "ver"; ver.textContent = VER[l];
+    const big = document.createElement("div"); big.className = "big"; big.textContent = times(D.overall[l]);
+    const cap = document.createElement("div"); cap.className = "cap";
+    cap.textContent = l === "C++" ? "the reference" : `of C++ speed overall`;
+    c.append(who, ver, big, cap); scores.appendChild(c);
+  }
+
+  const others = LANGS.filter((l) => l !== "C++");
+  const cats = ["cpu_single", "cpu_multi", "ram", "gpu"];
+  const ratio = (t, l) => (t.rate[l] != null && t.rate["C++"]) ? t.rate[l] / t.rate["C++"] : null;
+  const rangeNote = (t, l) => { const r = t.range[l]; return r ? `${num(r[0])}–${num(r[1])} over ${r[2]} runs` : ""; };
+
+  function renderAll() {
+    // score by category
+    legend("lg-cat", others);
+    const catRows = [...cats.map((c) => ({ key: c, label: CAT[c] })), { key: "overall", label: "Overall" }];
+    hbars("ch-cat", {
+      rows: catRows, series: others, scale: "log", domain: [0.03, 3], ticks: [0.05, 0.1, 0.2, 0.5, 1, 2],
+      tickFmt: (t) => t === 1 ? "1× = C++" : `${t}×`, barH: 12, labelW: (n) => n ? 110 : 150,
+      get: (r, l) => r.key === "overall" ? D.overall[l] : D.categories[r.key][l],
+      valFmt: (v) => times(v), refs: [{ x: 1, label: "" }],
+      aria: "Bar chart: speed of Python, R and JavaScript relative to C++, per hardware area",
+      tip: (r) => ({ title: r.label, rows: others.map((l) => ({ color: col(l), value: times(r.key === "overall" ? D.overall[l] : D.categories[r.key][l]), label: l })), note: "C++ = 1×" }),
+    });
+    table("tb-cat", ["Area", ...LANGS], catRows.map((r) => [r.label, ...LANGS.map((l) => times(r.key === "overall" ? D.overall[l] : D.categories[r.key][l]))]));
+
+    // every test
+    legend("lg-tests", others);
+    const testRows = [];
+    for (const c of cats) {
+      testRows.push({ header: true, label: CAT[c] });
+      for (const t of D.tests.filter((t) => t.category === c)) testRows.push({ label: t.test, sub: DESC[t.test], t });
+    }
+    hbars("ch-tests", {
+      rows: testRows, series: others, scale: "log", domain: [0.001, 15], ticks: [0.001, 0.01, 0.1, 1, 10],
+      tickFmt: (t) => t === 1 ? "1× = C++" : `${t}×`, barH: 11, rowPad: 6,
+      get: (r, l) => ratio(r.t, l), valFmt: (v) => times(v), refs: [{ x: 1, label: "" }],
+      aria: "Bar chart: speed relative to C++ for each of the 18 tests",
+      tip: (r) => ({
+        title: `${r.t.test} · ${r.t.unit}`,
+        rows: LANGS.map((l) => ({ color: col(l), value: num(r.t.rate[l]), label: l === "C++" ? "C++" : `${l} (${times(ratio(r.t, l))})` }))
+          .filter((x) => x.value !== "–"),
+        note: LANGS.filter((l) => r.t.range[l] && r.t.range[l][2] > 1).map((l) => `${l}: ${rangeNote(r.t, l)}`).join(" · "),
+      }),
+    });
+    table("tb-tests", ["Test", "Unit", ...LANGS], D.tests.map((t) => [t.test, t.unit, ...LANGS.map((l) => num(t.rate[l]))]), 1);
+
+    // parallel scaling
+    legend("lg-par", LANGS, "line");
+    lines("ch-par", {
+      xs: D.workers, xDomain: [1, 12], yDomain: [0, 12.5], yTicks: [0, 2, 4, 6, 8, 10, 12],
+      series: LANGS.map((l) => ({ lang: l, values: D.parallel[l] })),
+      yFmt: (t) => `${t}×`, xFmt: (t) => t, xLabel: "workers", height: 320,
+      ideal: (t) => t, vline: { x: 6, label: "6 physical cores" },
+      endFmt: (s, v) => `${s.lang} ${nf3.format(v)}×`, tipFmt: (v) => `${nf3.format(v)}×`,
+      tipTitle: (w) => `${w} worker${w > 1 ? "s" : ""}`, tipNote: (w) => `perfect scaling: ${w}×`,
+      aria: "Line chart: speedup over one worker for 1 to 12 workers",
+    });
+    table("tb-par", ["Workers", ...LANGS], D.workers.map((w, i) => [String(w), ...LANGS.map((l) => `${nf3.format(D.parallel[l][i])}×`)]));
+
+    // memory bandwidth
+    legend("lg-bw", LANGS);
+    const copy = D.tests.find((t) => t.test === "mem_copy");
+    const bwRows = [
+      { label: "copy", sub: "one core", get: (l) => copy.rate[l] },
+      { label: "triad", sub: "one core", get: (l) => D.triad["1"][l] },
+      { label: "triad", sub: "6 threads (C++)", get: (l) => D.triad["6"] && D.triad["6"][l] },
+      { label: "triad", sub: "12 threads (C++)", get: (l) => D.triad["12"] && D.triad["12"][l] },
+    ];
+    hbars("ch-bw", {
+      rows: bwRows, series: LANGS, scale: "linear", domain: [0, 56], ticks: [0, 10, 20, 30, 40, 50],
+      tickFmt: (t) => `${t}`, barH: 9, get: (r, l) => r.get(l) ?? null, valFmt: (v) => `${nf3.format(v)} GB/s`,
+      refs: [{ x: D.peaks.ram, label: `peak ${D.peaks.ram}` }], labelW: (n) => n ? 96 : 150,
+      aria: "Bar chart: memory bandwidth in GB/s",
+      tip: (r) => ({ title: `${r.label}, ${r.sub}`, rows: LANGS.filter((l) => r.get(l) != null).map((l) => ({ color: col(l), value: `${nf3.format(r.get(l))} GB/s`, label: l })), note: `theoretical peak ${D.peaks.ram} GB/s` }),
+    });
+    table("tb-bw", ["Test", ...LANGS], bwRows.map((r) => [`${r.label}, ${r.sub}`, ...LANGS.map((l) => r.get(l) != null ? nf3.format(r.get(l)) : "–")]));
+
+    // allocation
+    legend("lg-alloc", LANGS, "line");
+    lines("ch-alloc", {
+      xs: D.alloc_sizes, xScale: "log", xDomain: [1, 16], yDomain: [0, 17], yTicks: [0, 4, 8, 12, 16],
+      series: LANGS.map((l) => ({ lang: l, values: D.alloc[l] })), height: 250,
+      yFmt: (t) => `${t}`, xFmt: (t) => `${t} GiB`, xLabel: "array size (GB/s written + read)",
+      endFmt: (s, v) => `${s.lang} ${nf3.format(v)}`, tipFmt: (v) => `${nf3.format(v)} GB/s`,
+      tipTitle: (s) => `${s} GiB array`, tipNote: (s) => LANGS.map((l) => `${l} ${D.alloc_seconds[l][D.alloc_sizes.indexOf(s)]} s`).join(" · "),
+      aria: "Line chart: allocation speed in GB/s for arrays of 1 to 16 GiB",
+    });
+    table("tb-alloc", ["GiB", ...LANGS.map((l) => `${l} GB/s`)], D.alloc_sizes.map((s, i) => [String(s), ...LANGS.map((l) => nf3.format(D.alloc[l][i]))]));
+
+    // random access
+    const gather = D.tests.find((t) => t.test === "mem_gather");
+    hbars("ch-gather", {
+      rows: LANGS.map((l) => ({ label: l, lang: l })), series: ["_"], scale: "linear", domain: [0, 16], ticks: [0, 4, 8, 12, 16],
+      tickFmt: (t) => `${t} ns`, barH: 14, rowPad: 6, labelW: () => 92,
+      get: (r) => 1000 / gather.rate[r.lang], valFmt: (v) => `${nf3.format(v)} ns`,
+      aria: "Bar chart: nanoseconds per random read, per language",
+      tip: (r) => ({ title: "random reads from 2 GiB", rows: [{ color: col(r.lang), value: `${nf3.format(1000 / gather.rate[r.lang])} ns`, label: `${r.lang} · ${num(gather.rate[r.lang])} M reads/s` }] }),
+    });
+    // colour the single-series bars by language
+    document.querySelectorAll("#ch-gather path").forEach((p, i) => p.setAttribute("style", `fill:${col(LANGS[i])}`));
+
+    // GPU small multiples
+    legend("lg-gpu", LANGS);
+    const grid = document.getElementById("gpu-grid");
+    if (!grid.children.length) {
+      for (const t of D.tests.filter((t) => t.category === "gpu")) {
+        const f = document.createElement("figure");
+        const cap = document.createElement("figcaption"); const s = document.createElement("span"); s.className = "t";
+        s.textContent = `${DESC[t.test]} (${t.unit})`; cap.appendChild(s);
+        const pk = t.unit === "GFLOP/s" ? D.peaks.gpu_fp32 : (t.test === "gpu_bandwidth" ? D.peaks.ram : null);
+        if (pk) { const n = document.createElement("span"); n.className = "note"; n.textContent = `line: peak ${nf0.format(pk)}`; cap.appendChild(n); }
+        const ch = document.createElement("div"); ch.className = "chart"; ch.id = `ch-${t.test}`;
+        f.append(cap, ch); grid.appendChild(f);
+      }
+    }
+    for (const t of D.tests.filter((t) => t.category === "gpu")) {
+      const peak = t.unit === "GFLOP/s" ? D.peaks.gpu_fp32 : (t.test === "gpu_bandwidth" ? D.peaks.ram : null);
+      const max = Math.max(...LANGS.map((l) => t.rate[l] || 0));
+      const top = peak ? peak * 1.06 : max * 1.25;
+      const step = top > 1000 ? 400 : top > 100 ? 50 : top > 40 ? 10 : top > 10 ? 5 : 1;
+      const ticks = []; for (let v = 0; v <= top; v += step) ticks.push(v);
+      hbars(`ch-${t.test}`, {
+        rows: LANGS.map((l) => ({ label: l, lang: l })), series: ["_"], scale: "linear", domain: [0, top], ticks,
+        tickFmt: (v) => nf0.format(v), barH: 12, rowPad: 5, labelW: () => 88,
+        get: (r) => t.rate[r.lang], valFmt: (v) => nf3.format(v),
+        refs: peak ? [{ x: peak, label: "" }] : [],
+        aria: `Bar chart: ${t.test} in ${t.unit}`,
+        tip: (r) => ({ title: `${t.test} · ${t.unit}`, rows: [{ color: col(r.lang), value: num(t.rate[r.lang]), label: r.lang }],
+          note: [rangeNote(t, r.lang), peak ? `${Math.round(100 * t.rate[r.lang] / peak)}% of peak` : ""].filter(Boolean).join(" · ") }),
+      });
+      document.querySelectorAll(`#ch-${t.test} path`).forEach((p, i) => p.setAttribute("style", `fill:${col(LANGS[i])}`));
+    }
+
+    // share of peak
+    legend("lg-util", LANGS);
+    hbars("ch-util", {
+      rows: D.util.map((u) => ({ label: u.name.split(" (")[0], sub: u.name.includes("(") ? u.name.split(" (")[1].replace(")", "") : "", u })),
+      series: LANGS, scale: "linear", domain: [0, 100], ticks: [0, 25, 50, 75, 100], tickFmt: (t) => `${t}%`, barH: 9,
+      labelW: (n) => n ? 120 : 200, get: (r, l) => r.u.pct[l], valFmt: (v) => `${Math.round(v)}%`,
+      aria: "Bar chart: share of theoretical peak reached by each language",
+      tip: (r) => ({ title: r.u.name, rows: LANGS.map((l) => ({ color: col(l), value: `${nf3.format(r.u.pct[l])}%`, label: l })), note: `peak ${nf0.format(r.u.peak)} ${r.u.unit}` }),
+    });
+    table("tb-util", ["Resource", "Peak", ...LANGS], D.util.map((u) => [u.name, `${nf0.format(u.peak)} ${u.unit}`, ...LANGS.map((l) => `${nf3.format(u.pct[l])}%`)]));
+
+    heat();
+  }
+
+  // ---------------------------------------------------------------- sensor timeline
+  function heat() {
+    const s = D.sensors, box = document.getElementById("ch-heat");
+    document.getElementById("heat-batch").textContent = `run ${s.batch}`;
+    const W = Math.max(280, box.clientWidth), narrow = W < 520;
+    const L = narrow ? 42 : 52, R = 12, T = 22, gapY = 26, pH = narrow ? 120 : 150, B = 30;
+    const H = T + pH * 2 + gapY + B;
+    const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Line charts: CPU temperature and average clock speed over one full run" });
+    const tMax = s.t[s.t.length - 1];
+    const x = scale("linear", 0, tMax, L, W - R);
+    const PH = { cpp: "C++", python: "Python", r: "R", js: "JavaScript" };
+    // phase spans
+    let i0 = 0;
+    for (let i = 1; i <= s.phase.length; i++) {
+      if (i === s.phase.length || s.phase[i] !== s.phase[i0]) {
+        const name = PH[s.phase[i0]];
+        if (name) {
+          const x0 = x(s.t[i0]), x1 = x(s.t[i - 1]);
+          for (const py of [T, T + pH + gapY]) svgEl("rect", { x: x0, y: py, width: Math.max(1, x1 - x0), height: pH, style: `fill:${col(name)}`, opacity: 0.12 }, svg);
+          if (x1 - x0 > 30) text(svg, (x0 + x1) / 2, T - 8, name, "phase-label", { "text-anchor": "middle" });
+        }
+        i0 = i;
+      }
+    }
+    const panels = [
+      { key: "cpu_temp", y0: T, d: [40, 105], ticks: [40, 60, 80, 100], fmt: (v) => `${v}°`, label: "CPU °C" },
+      { key: "cpu_mhz", y0: T + pH + gapY, d: [1000, 4500], ticks: [1000, 2000, 3000, 4000], fmt: (v) => `${v / 1000}`, label: "GHz, avg" },
+    ];
+    for (const p of panels) {
+      const y = scale("linear", p.d[0], p.d[1], p.y0 + pH, p.y0);
+      for (const t of p.ticks) {
+        svgEl("line", { x1: L, x2: W - R, y1: y(t), y2: y(t), class: "gridline" }, svg);
+        text(svg, L - 6, y(t) + 4, p.fmt(t), "tick axis-label", { "text-anchor": "end" });
+      }
+      text(svg, L + 4, p.y0 + 12, p.label, "axis-label");
+      svgEl("polyline", { points: s.t.map((t, i) => `${x(t).toFixed(1)},${y(s[p.key][i]).toFixed(1)}`).join(" "), fill: "none", stroke: "var(--ink-2)", "stroke-width": 1.5, "stroke-linejoin": "round" }, svg);
+      p.y = y;
+    }
+    for (let t = 0; t <= tMax; t += 60) text(svg, x(t), H - B + 18, `${t / 60} min`, "tick axis-label", { "text-anchor": "middle" });
+    const cross = svgEl("line", { x1: 0, x2: 0, y1: T, y2: T + pH * 2 + gapY, class: "crosshair", visibility: "hidden" }, svg);
+    const hit = svgEl("rect", { x: L, y: T, width: W - R - L, height: pH * 2 + gapY, style: "fill:transparent" }, svg);
+    let idx = 0;
+    const build = (e) => {
+      if (e) {
+        const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
+        const px = pt.matrixTransform(svg.getScreenCTM().inverse()).x;
+        const tt = (px - L) / (W - R - L) * tMax;
+        idx = Math.max(0, Math.min(s.t.length - 1, s.t.findIndex((v) => v >= tt)));
+      }
+      cross.setAttribute("x1", x(s.t[idx])); cross.setAttribute("x2", x(s.t[idx])); cross.setAttribute("visibility", "visible");
+      const who = PH[s.phase[idx]] || "between languages";
+      return { title: `${Math.floor(s.t[idx] / 60)}:${String(Math.round(s.t[idx] % 60)).padStart(2, "0")} · ${who}`,
+        rows: [{ value: `${nf3.format(s.cpu_temp[idx])} °C`, label: "CPU temperature" }, { value: `${(s.cpu_mhz[idx] / 1000).toFixed(2)} GHz`, label: "CPU clock, average" },
+               { value: `${s.gpu_busy[idx]}%`, label: "GPU busy" }, { value: `${nf3.format(s.ram[idx])} GiB`, label: "RAM in use" }].map((r) => ({ ...r, color: PH[s.phase[idx]] ? col(PH[s.phase[idx]]) : "var(--ink-2)" })) };
+    };
+    bindTip(hit, build);
+    hit.addEventListener("pointerleave", () => cross.setAttribute("visibility", "hidden"));
+    hit.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+        idx = Math.max(0, Math.min(s.t.length - 1, idx + (e.key === "ArrowRight" ? 5 : -5)));
+        const r = hit.getBoundingClientRect(); const b = build(null);
+        showTip(b.title, b.rows, b.note, r.left + (x(s.t[idx]) - L) / (W - R - L) * r.width, r.top);
+        e.preventDefault();
+      }
+    });
+    hit.setAttribute("aria-label", "Sensor timeline. Use left and right arrow keys to move through the run.");
+    box.replaceChildren(svg);
+  }
+
+  renderAll();
+  let pending = null, lastW = document.querySelector(".page").clientWidth;
+  new ResizeObserver(() => {
+    const w = document.querySelector(".page").clientWidth;
+    if (w === lastW) return;
+    lastW = w; clearTimeout(pending); pending = setTimeout(renderAll, 120);
+  }).observe(document.querySelector(".page"));
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(renderAll);
+})();
+</script>
+</body>
+</html>

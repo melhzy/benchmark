@@ -10,7 +10,8 @@ Linux only. Licensed under the [MIT License](LICENSE).
 
 ## Results
 
-Charts and findings: [`analysis.ipynb`](analysis.ipynb) (GitHub displays it with all charts). Raw data:
+**Results page: <https://melhzy.github.io/benchmark/>** (interactive charts; source in [`docs/`](docs/)).
+The full analysis is in [`analysis.ipynb`](analysis.ipynb) (GitHub displays it with all charts). Raw data:
 [`results/`](results/), one folder per machine.
 
 First machine: Dell Inspiron 14 7425 2-in-1 — AMD Ryzen 5 5625U (6 cores / 12 threads, 15 W), 64 GB DDR4-3200,
