@@ -1,12 +1,15 @@
 # Environments and dependencies (recreated by the setup steps in README.md)
 .venv/
 JavaScript/node_modules/
+deps/
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
 
 # C++ build output
 Cpp/common_benchmark
+Cpp/common_benchmark.exe
+Cpp/*.dll
 Cpp/.build-*
 
 # Editor / OS clutter

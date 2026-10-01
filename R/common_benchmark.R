@@ -33,20 +33,35 @@ while (i <= length(args)) {
 file_arg   <- grep("^--file=", commandArgs(FALSE), value = TRUE)
 script_dir <- if (length(file_arg)) dirname(normalizePath(sub("^--file=", "", file_arg[1]))) else getwd()
 root       <- dirname(script_dir)
-# Machine id (SPEC.md): BENCH_MACHINE, else the DMI vendor + product name, else the hostname.
+windows    <- .Platform$OS.type == "windows"
+reg <- function(key, value) {          # a string under HKEY_LOCAL_MACHINE (Windows), or ""
+  v <- tryCatch(suppressWarnings(utils::readRegistry(key, "HLM"))[[value]], error = function(e) NULL)
+  if (is.null(v)) "" else trimws(as.character(v))
+}
+# Machine id (SPEC.md): BENCH_MACHINE, else the firmware (DMI / SMBIOS) vendor + product name, else the
+# hostname; the vendor is left out when the product name already starts with it.
 # slug: lowercase, every run of characters outside [a-z0-9] becomes "-", no "-" at either end.
 slug <- function(x) gsub("^-+|-+$", "", gsub("[^a-z0-9]+", "-", tolower(x)))
 read_dmi <- function(f) {
+  if (windows) return(reg("HARDWARE\\DESCRIPTION\\System\\BIOS",
+                          c(sys_vendor = "SystemManufacturer", product_name = "SystemProductName")[[f]]))
   v <- tryCatch(readLines(file.path("/sys/class/dmi/id", f), n = 1, warn = FALSE), error = function(e) "")
   if (length(v)) trimws(v) else ""
 }
 machine <- Sys.getenv("BENCH_MACHINE")
-if (!nzchar(machine)) machine <- slug(paste(read_dmi("sys_vendor"), read_dmi("product_name")))
+if (!nzchar(machine)) {
+  v <- slug(read_dmi("sys_vendor")); p <- slug(read_dmi("product_name"))
+  machine <- if (nzchar(v) && (p == v || startsWith(p, paste0(v, "-")))) p else slug(paste(read_dmi("sys_vendor"), read_dmi("product_name")))
+}
 if (!nzchar(machine)) machine <- slug(Sys.info()[["nodename"]])
 # Replaces the user's home directory with "~", so no personal paths end up in results.
+# (On Windows R's "~" is the Documents folder, so USERPROFILE is used, written with \ and with /.)
 tilde <- function(x) {
-  home <- path.expand("~")
-  if (nzchar(home) && home != "/") gsub(home, "~", x, fixed = TRUE) else x
+  homes <- unique(c(Sys.getenv(c("USERPROFILE", "HOME")), path.expand("~")))
+  homes <- homes[nzchar(homes) & homes != "/"]
+  homes <- unique(c(homes, gsub("\\", "/", homes, fixed = TRUE), gsub("/", "\\", homes, fixed = TRUE)))
+  for (h in homes[order(-nchar(homes))]) x <- gsub(h, "~", x, fixed = TRUE)
+  x
 }
 if (is.null(out_dir)) out_dir <- file.path(root, "results", machine)
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
@@ -60,25 +75,52 @@ if (!is.null(only)) {
 kernels_path <- file.path(root, "common", "kernels.cl")
 
 # ---------------------------------------------------------------- system information
+# Linux: /proc and /sys. Windows: the registry, detectCores() (correct on Windows) and one PowerShell query.
 read1 <- function(path) tryCatch(readLines(path, n = 1, warn = FALSE), error = function(e) NA_character_)
 cpu_temp <- function() {   # first hwmon sensor of a known CPU driver, in order of preference
-  hwmons <- Sys.glob("/sys/class/hwmon/hwmon*")
+  hwmons <- Sys.glob("/sys/class/hwmon/hwmon*")   # (none on Windows: no CPU sensor without admin rights)
   for (want in c("k10temp", "zenpower", "coretemp", "cpu_thermal"))
     for (h in hwmons)
       if (identical(read1(file.path(h, "name")), want))
         return(as.numeric(read1(file.path(h, "temp1_input"))) / 1000)
   NA_real_
 }
-cpuinfo <- readLines("/proc/cpuinfo")
-field <- function(key) trimws(sub("^[^:]*:", "", grep(paste0("^", key, "\\s*:"), cpuinfo, value = TRUE)))
-phys_cores <- length(unique(paste(field("physical id"), field("core id"))))
-logical_cpus <- detectCores()
-meminfo_kb <- function(key) {
-  line <- grep(paste0("^", key, ":"), readLines("/proc/meminfo"), value = TRUE)
-  as.numeric(gsub("[^0-9]", "", line))
+win_status <- function() {   # Windows: c(MemTotal, MemAvailable) in KiB and the power line status
+  out <- tryCatch(system2("powershell", c("-NoProfile", "-NonInteractive", "-Command", shQuote(paste(
+    "Add-Type -AssemblyName System.Windows.Forms; $o = Get-CimInstance Win32_OperatingSystem;",
+    "Write-Output $o.TotalVisibleMemorySize $o.FreePhysicalMemory",
+    "([System.Windows.Forms.SystemInformation]::PowerStatus.PowerLineStatus)"), type = "cmd")),
+    stdout = TRUE, stderr = FALSE), error = function(e) character())
+  list(MemTotal = as.numeric(out[1]), MemAvailable = as.numeric(out[2]), power = if (length(out) >= 3) out[3] else "")
 }
-on_ac <- any(vapply(Sys.glob("/sys/class/power_supply/*/online"), read1, "") == "1")
+if (windows) {
+  cpuinfo <- character()
+  field <- function(key) if (key == "model name") reg("HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0", "ProcessorNameString") else character()
+  phys_cores <- detectCores(logical = FALSE)
+  win0 <- win_status()
+  meminfo_kb <- function(key) if (key == "MemTotal") win0$MemTotal else win_status()[[key]]
+  on_ac <- win0$power != "Offline"
+  modes <- c("961cc777-2547-4f9d-8174-7d86181b8a7a" = "best power efficiency",
+             "00000000-0000-0000-0000-000000000000" = "balanced",
+             "ded574b5-45a0-4f42-8737-46345c09c238" = "best performance")
+  overlay <- tolower(reg("SYSTEM\\CurrentControlSet\\Control\\Power\\User\\PowerSchemes",
+                         if (on_ac) "ActiveOverlayAcPowerScheme" else "ActiveOverlayDcPowerScheme"))
+  profile <- if (overlay %in% names(modes)) modes[[overlay]] else overlay
+} else {
+  cpuinfo <- readLines("/proc/cpuinfo")
+  field <- function(key) trimws(sub("^[^:]*:", "", grep(paste0("^", key, "\\s*:"), cpuinfo, value = TRUE)))
+  phys_cores <- length(unique(paste(field("physical id"), field("core id"))))
+  meminfo_kb <- function(key) {
+    line <- grep(paste0("^", key, ":"), readLines("/proc/meminfo"), value = TRUE)
+    as.numeric(gsub("[^0-9]", "", line))
+  }
+  on_ac <- any(vapply(Sys.glob("/sys/class/power_supply/*/online"), read1, "") == "1")
+  profile <- read1("/sys/firmware/acpi/platform_profile")
+}
+logical_cpus <- detectCores()
 blas_path <- sessionInfo()$BLAS
+# R on Windows ships its own reference BLAS (Rblas.dll), which sessionInfo() does not name.
+if (windows && !nzchar(blas_path)) blas_path <- normalizePath(file.path(R.home("bin"), "Rblas.dll"), mustWork = FALSE)
 blas_threads <- if (grepl("openblas", blas_path, ignore.case = TRUE)) {
   env <- Sys.getenv(c("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS"))
   env <- suppressWarnings(as.integer(env[nzchar(env)]))
@@ -98,7 +140,7 @@ meta <- list(
   cpu = field("model name")[1], physical_cores = phys_cores, logical_cpus = logical_cpus,
   ram_gib = sprintf("%.1f", meminfo_kb("MemTotal") / 2^20),
   power = if (on_ac) "AC" else "battery",
-  platform_profile = read1("/sys/firmware/acpi/platform_profile"),
+  platform_profile = profile,
   cpu_temp_start_c = cpu_temp(), cpu_temp_end_c = "",
   started = format(start_time, "%Y-%m-%dT%H:%M:%S"), elapsed_s = "", host = machine, machine = machine,
   gpu_platform = "", gpu_device = "", gpu_compute_units = "", gpu_max_clock_mhz = "", gpu_driver = "",
@@ -180,6 +222,8 @@ mandel_rows <- function(W, y0, y1) {          # rows y0..y1 (0-based, inclusive)
   total
 }
 
+mandel_chunk <- function(b, W) mandel_rows(W, b[1], b[2])   # one parallel chunk (rows b[1]..b[2])
+
 fib <- function(k) if (k < 2) k else fib(k - 1) + fib(k - 2)
 fib_calls <- function(n) { a <- 0; b <- 1; for (k in 0:n) { t <- a + b; a <- b; b <- t }; 2 * a - 1 }
 
@@ -242,12 +286,28 @@ run_cpu_ram <- function(t, size) {
       chunks <- chunks[vapply(chunks, function(b) b[2] >= b[1], TRUE)]
       counts <- sort(unique(c(1, 2, 4, phys_cores, 8, logical_cpus)))
       counts <- counts[counts >= 1 & counts <= logical_cpus]
-      for (workers in counts)
-        measure(t, size, workers, W * W, function() {
-          t0 <- now()
-          parts <- mclapply(chunks, function(b) mandel_rows(W, b[1], b[2]), mc.cores = workers)
-          sec <- since(t0)
-          list(sec = sec, check = sum(unlist(parts))) })
+      for (workers in counts) {
+        if (!windows) {
+          measure(t, size, workers, W * W, function() {
+            t0 <- now()
+            parts <- mclapply(chunks, function(b) mandel_rows(W, b[1], b[2]), mc.cores = workers)
+            sec <- since(t0)
+            list(sec = sec, check = sum(unlist(parts))) })
+        } else {
+          # Windows cannot fork: a socket cluster of R processes, started (and given mandel_rows) before
+          # timing, like Python's pool; parLapply hands each worker one chunk at a time.
+          cl <- makeCluster(workers)
+          tryCatch({
+            clusterExport(cl, c("mandel_rows", "mandel_chunk"), envir = globalenv())
+            invisible(clusterCall(cl, function() TRUE))
+            measure(t, size, workers, W * W, function() {
+              t0 <- now()
+              parts <- parLapplyLB(cl, chunks, mandel_chunk, W = W, chunk.size = 1)
+              sec <- since(t0)
+              list(sec = sec, check = sum(unlist(parts))) })
+          }, finally = stopCluster(cl))
+        }
+      }
     },
 
     matmul_blas = {
@@ -335,10 +395,10 @@ gpu_setup <- function() {
   pinfo <- OpenCL::oclInfo(plat)
   ctx <- OpenCL::oclContext(dev, precision = "single")
   code <- paste(readLines(kernels_path), collapse = "\n")
-  kern <- list(
+  kern <- suppressWarnings(list(        # (warnings = compiler notes such as NVIDIA's "overriding noinline")
     fma_peak = OpenCL::oclSimpleKernel(ctx, "fma_peak", code, "single"),
     copy4    = OpenCL::oclSimpleKernel(ctx, "copy4", code, "single"),
-    sgemm4x4 = OpenCL::oclSimpleKernel(ctx, "sgemm4x4", code, "single"))
+    sgemm4x4 = OpenCL::oclSimpleKernel(ctx, "sgemm4x4", code, "single")))
   cu <- tryCatch(OpenCL:::.oclDeviceInfoEntry(dev, 0x1002L, 4L), error = function(e) NA)  # CL_DEVICE_MAX_COMPUTE_UNITS
   meta$gpu_platform      <<- paste(pinfo$name, pinfo$version)
   meta$gpu_device        <<- info$name
@@ -349,7 +409,18 @@ gpu_setup <- function() {
   NULL
 }
 
+# Untimed, before the first GPU test: fma_peak back to back, so a GPU that idles at a low clock
+# (NVIDIA laptop GPUs do) is at its working clock when timing starts (SPEC section 4, gpu).
+gpu_warm <- FALSE
+gpu_warmup <- function(seconds) {
+  cat(sprintf("  %-11s %-22s 2 s of fma_peak, not timed\n", "gpu", "warm-up")); flush.console()
+  t0 <- now()
+  while (since(t0) < seconds) { out <- OpenCL::oclRun(gpu$kern$fma_peak, 1048576L); invisible(out[1]) }
+}
+
 run_gpu <- function(t, size) {
+  if (!gpu_warm && mode != "verify") gpu_warmup(2)
+  gpu_warm <<- TRUE
   S <- as.numeric(size); ctx <- gpu$ctx; k <- gpu$kern
   switch(t$test,
     gpu_fp32_peak = {
@@ -428,5 +499,6 @@ for (r in seq_len(nrow(tests))) {
 meta$cpu_temp_end_c <- cpu_temp()
 meta$elapsed_s <- sprintf("%.1f", since(start_time))
 write_results(); write_meta()
-cat(sprintf("\nDone in %s s. CPU %.0f C -> %.0f C\nSaved %s\n      %s\n", meta$elapsed_s,
-            as.numeric(meta$cpu_temp_start_c), meta$cpu_temp_end_c, tilde(results_file), tilde(meta_file)))
+temps <- if (is.na(meta$cpu_temp_start_c)) "" else
+  sprintf(". CPU %.0f C -> %.0f C", as.numeric(meta$cpu_temp_start_c), meta$cpu_temp_end_c)
+cat(sprintf("\nDone in %s s%s\nSaved %s\n      %s\n", meta$elapsed_s, temps, tilde(results_file), tilde(meta_file)))

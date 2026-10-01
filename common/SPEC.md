@@ -12,9 +12,11 @@ Files:
 | `common/kernels.cl` | OpenCL kernels used by the C++, Python and R GPU sections |
 | `common/kernels.wgsl` | the same kernels translated to WebGPU (WGSL), for JavaScript |
 | `Cpp/common_benchmark.cpp` (+ `Cpp/Makefile`) | C++ implementation |
-| `Python/common_benchmark.py` | Python implementation (Miniconda base: NumPy + pyopencl) |
+| `Python/common_benchmark.py` | Python implementation (NumPy + pyopencl) |
 | `R/common_benchmark.R` | R implementation |
 | `JavaScript/common_benchmark.mjs` (+ `package.json`) | JavaScript implementation (Node.js) |
+| `run_all.sh` | runs all four on Linux |
+| `run_all.ps1` (+ `run_all.cmd`), `setup_windows.ps1`, `common/windows_tools.ps1` | the same on Windows, and its setup |
 | `results/` | output of every run (shared by all languages) |
 
 ## 1. Command line (identical for all four)
@@ -36,30 +38,38 @@ Files:
 ### Machines and environment variables
 
 Results are kept per machine, in `results/<machine>/`. The **machine id** is computed the same way
-by all four programs and `run_all.sh`: `BENCH_MACHINE` if set, otherwise the DMI vendor and product
-name (`/sys/class/dmi/id/sys_vendor` + `" "` + `/sys/class/dmi/id/product_name`, each trimmed),
-otherwise the hostname; then lower-cased, with every run of characters other than `[a-z0-9]`
-replaced by `-` and leading/trailing `-` removed (e.g. `dell-inc-inspiron-14-7425-2-in-1`).
+by all four programs and the runners: `BENCH_MACHINE` if set, otherwise the firmware (DMI / SMBIOS)
+vendor and product name, otherwise the hostname, made into a *slug*: lower-cased, with every run of
+characters other than `[a-z0-9]` replaced by `-` and leading/trailing `-` removed. Vendor and product
+come from `/sys/class/dmi/id/sys_vendor` and `/sys/class/dmi/id/product_name` on Linux, and from the
+registry key `HKLM\HARDWARE\DESCRIPTION\System\BIOS` (`SystemManufacturer`, `SystemProductName`) on
+Windows. The id is slug(vendor + " " + product), except that when slug(product) equals slug(vendor) or
+starts with slug(vendor) + "-", it is slug(product) alone. Examples: `dell-inc-inspiron-14-7425-2-in-1`
+("Dell Inc." + "Inspiron 14 7425 2-in-1") and `alienware-m16-r1` ("Alienware" + "Alienware m16 R1").
 
 | variable | effect |
 |---|---|
 | `BENCH_MACHINE` | machine id / results folder (`run_all.sh --machine NAME` sets it) |
 | `BENCH_BATCH` | batch id shared by one `run_all.sh` invocation |
-| `BENCH_PYTHON` | Python interpreter `run_all.sh` uses (default: `python3` on `PATH`) |
+| `BENCH_PYTHON` | Python interpreter the runner uses (default: `python3` on `PATH`; Windows: `python`, else the `py` launcher) |
+| `BENCH_RSCRIPT` | Windows: `Rscript.exe` to use (default: on `PATH`, else the newest R in the registry / Program Files) |
 | `BENCH_GPU` | OpenCL (C++, Python, R): use the first GPU whose name contains this text (case-insensitive); none matches → GPU tests skipped, listing the devices |
 | `BENCH_GPU_POWER` | JavaScript/WebGPU: `high-performance` or `low-power` adapter preference |
 | `BENCH_OPENBLAS` | full path of the OpenBLAS shared library (C++ build and JavaScript), if not found automatically |
+| `BENCH_OPENCL_SDK` | Windows: OpenCL SDK folder (`include\CL\cl.h`, `lib\OpenCL.lib`) for the C++ build; default `deps\opencl-sdk` |
 | `RUSTICL_ENABLE` | Mesa OpenCL drivers to expose; default `radeonsi,iris` (AMD and Intel GPUs) |
 
 OpenBLAS is searched (C++ at build time, JavaScript at run time) in this order:
 `/usr/lib/x86_64-linux-gnu/openblas-pthread/libopenblas.so.0`, `/usr/lib/x86_64-linux-gnu/libopenblas.so.0`,
 `/usr/lib/aarch64-linux-gnu/openblas-pthread/libopenblas.so.0`, `/usr/lib64/libopenblasp.so.0`,
-`/usr/lib64/libopenblas.so.0`, `/usr/lib/libopenblas.so.0`, `/usr/lib/libopenblas.so`. If none exists,
+`/usr/lib64/libopenblas.so.0`, `/usr/lib/libopenblas.so.0`, `/usr/lib/libopenblas.so`; on Windows:
+`deps\openblas\bin\libopenblas.dll` (installed by `setup_windows.ps1`), `C:\OpenBLAS\bin\libopenblas.dll`,
+`C:\msys64\ucrt64\bin\libopenblas.dll`, `C:\msys64\mingw64\bin\libopenblas.dll`. If none exists,
 `matmul_blas` is skipped with the reason.
 
 **No personal data in results** (they are committed to a public repository): the meta value `host`
 is the machine id, never the real hostname, and the user's home directory is written as `~` in
-every value.
+every value (Windows: `%USERPROFILE%`, written with `\` or `/`).
 
 ## 2. Sizes, repeats and timing
 
@@ -131,22 +141,44 @@ skipped, failed
 - `cpu` from `/proc/cpuinfo` "model name"; `physical_cores` = number of distinct
   ("physical id", "core id") pairs in `/proc/cpuinfo` (do **not** use R's
   `detectCores(logical = FALSE)`, which is wrong on Linux); `logical_cpus` = online CPUs.
-- `power`: `AC` or `battery` (any `/sys/class/power_supply/*/online` == 1 → AC).
-- `platform_profile`: `/sys/firmware/acpi/platform_profile`.
+  Windows: `cpu` = registry `HKLM\HARDWARE\DESCRIPTION\System\CentralProcessor\0\ProcessorNameString`;
+  `physical_cores` = processor cores from `GetLogicalProcessorInformationEx` (R: `detectCores(logical = FALSE)`,
+  which is right on Windows; JavaScript: the sum of `NumberOfCores` of `Win32_Processor`).
+- `power`: `AC` or `battery` (any `/sys/class/power_supply/*/online` == 1 → AC; Windows: the AC line
+  status from `GetSystemPowerStatus`, or AC when there is no battery).
+- `platform_profile`: `/sys/firmware/acpi/platform_profile`; Windows: the power mode for the current
+  power source (registry `...\Control\Power\User\PowerSchemes`, `ActiveOverlayAcPowerScheme` /
+  `ActiveOverlayDcPowerScheme`), written as `best power efficiency`, `balanced` or `best performance`.
 - CPU temperature: `temp1_input` / 1000 of the first hwmon whose `name` is, in this order of
-  preference, `k10temp`, `zenpower`, `coretemp`, `cpu_thermal`.
+  preference, `k10temp`, `zenpower`, `coretemp`, `cpu_thermal`. Windows offers no CPU temperature
+  to programs without administrator rights: the values are empty there.
+- `MemAvailable` (used by `mem_alloc`) and `ram_gib`: `/proc/meminfo`; Windows: `GlobalMemoryStatusEx`
+  (`ullAvailPhys`, `ullTotalPhys`), or the equivalent `Win32_OperatingSystem` values (R) and
+  `os.freemem()` / `os.totalmem()` (JavaScript).
 - `skipped`: `;`-separated `test: reason` items (e.g. GPU missing, size too big for RAM).
 
-**Files written by `run_all.sh`** (not by the programs), in the same folder:
+**Files written by the runner** (`run_all.sh`, or `run_all.ps1` on Windows; not by the programs), in
+the same folder:
 
 - `system_<batch>.csv` (`key,value`): machine id, suite version (`suite_commit` = `git describe`,
-  `suite_tests_sha` = hash of `tests.csv` and both kernel files — compare machines only when this
-  matches), vendor/product, OS, kernel, CPU model, max clock, cores, SMT, instruction-set flags,
-  L3 size, RAM size/type/speed/modules (from `udevadm`, no root needed), GPUs (`lspci`), OpenCL
-  devices, power source and profile, governor, transparent huge pages, tool paths. The notebook
-  computes each machine's theoretical peaks from this file.
+  `suite_tests_sha` = first 12 hex digits of the SHA-256 of `tests.csv`, `kernels.cl` and `kernels.wgsl`
+  concatenated, with LF line endings — compare machines only when this matches), vendor/product, OS,
+  kernel, CPU model, max clock, cores, SMT, instruction-set flags, L3 size, RAM size/type/speed/modules
+  (from `udevadm`, no root needed), GPUs (`lspci`), OpenCL devices, power source and profile, governor,
+  transparent huge pages, tool paths. Windows fills the same keys from CIM and the registry (RAM type and
+  speed from `Win32_PhysicalMemory`, the power mode as above, `governor` = the power plan) and adds
+  `cpu_base_mhz` and, on hybrid CPUs, `performance_cores` / `efficiency_cores`; it leaves `cpu_max_mhz`
+  empty because Windows does not report a CPU's maximum boost clock. The notebook and the results
+  page compute each machine's theoretical peaks from this file.
 - `sensors_<batch>.csv`: one row per second — phase (language running), CPU temperature and clocks,
-  GPU temperature/load/clock (amdgpu sysfs, or `nvidia-smi` on NVIDIA), RAM in use.
+  GPU temperature/load/clock (amdgpu sysfs, or `nvidia-smi` on NVIDIA), RAM in use. On Windows the
+  clocks are the effective clock (base clock × the `% Processor Performance` counter, as Task Manager
+  shows it) and the temperature column is empty.
+
+**Optional, written by hand: `hardware.csv`** (`key,value,source`) — spec-sheet values the operating
+system does not report, which override `system_<batch>.csv` when peaks are computed: `cpu_max_mhz`,
+`cpu_e_max_mhz` (efficiency cores of a hybrid CPU), `gpu_memory_gbs` (memory bandwidth of a discrete GPU).
+`source` says where each value comes from.
 
 Console output: a short header (language, version, CPU, BLAS, GPU device, mode, output path),
 then one line per test with size, median time and median rate, e.g.
@@ -254,7 +286,10 @@ C++: `std::thread` workers pulling chunk indices from an atomic counter; Python:
 JavaScript: a pool of `worker_threads` created and warmed up before timing (like Python), chunk
 indices handed to whichever worker is free;
 R: `parallel::mclapply(mc.cores = workers)` (R forks inside the call, so its start-up **is**
-included — that is how R works). threads = workers, work = W*W (px),
+included — that is how R works). Windows cannot fork: there Python's pool starts its workers with
+*spawn* (still not timed), and R uses a socket cluster (`makeCluster(workers)`, `mandel_rows`
+exported, one call to every worker) created before timing, then times
+`parLapplyLB(chunk.size = 1)`. threads = workers, work = W*W (px),
 check = total iterations (same as `mandelbrot` with the same W).
 
 **matmul_blas** (size N, style blas) — setup (double precision, row-major definition):
@@ -292,7 +327,7 @@ NumPy: `np.empty(n)`, `x.fill(1.0)`, `x.sum()`, `del x`; R: `x <- numeric(n)`, `
 (from `/proc/meminfo`) at the start of the test, and list them in `skipped`.
 repeats = 1, no warm-up; size = G, work = 2·G·2^30 bytes, check = the sum (= n).
 
-### gpu — integrated GPU through OpenCL (JavaScript: WebGPU)
+### gpu — the GPU through OpenCL (JavaScript: WebGPU)
 
 Device: the first OpenCL device of type GPU on any platform, or the first whose name contains
 `BENCH_GPU`. If there is none (or OpenCL is not available for the language), skip all GPU tests
@@ -306,8 +341,15 @@ call). Float32 throughout; the kernels' calling convention is described in `kern
 R's `oclRun` cannot wait for a kernel, so R ends each timed launch with a 1-element blocking read,
 and it allocates a fresh output buffer on every launch (included in R's times).
 
+**GPU warm-up** (added with Windows support): before the first GPU test, except in verify mode, run
+`fma_peak` with 2^20 work-items back to back for 2 seconds, untimed, and print one `warm-up` line. A
+discrete laptop GPU (NVIDIA) idles at a few hundred MHz and needs a sustained load to reach its working
+clock; without this, a test's single warm-up launch is too short and the measured rate depends on the
+GPU's power state rather than on the language. (Integrated GPUs are unaffected: the Linux results of
+the AMD iGPU, measured before this rule, have identical times in every repetition.)
+
 **JavaScript (WebGPU)**: Node.js has no maintained OpenCL binding, so it uses the npm package
-`webgpu` (Google's Dawn, Vulkan backend) and `common/kernels.wgsl`, a line-by-line
+`webgpu` (Google's Dawn: Vulkan backend on Linux, Direct3D 12 on Windows) and `common/kernels.wgsl`, a line-by-line
 translation of `kernels.cl` (differences listed at the top of that file). Timed kernel launch =
 encode + `queue.submit` + `await queue.onSubmittedWorkDone()`. Upload = `queue.writeBuffer` +
 `await onSubmittedWorkDone()`. Download = `copyBufferToBuffer` into a `MAP_READ` buffer +
@@ -347,8 +389,13 @@ work = S·2^20 bytes, check = first element read (= 2.5).
   Python for loop, hashmap and string_ops; `multiprocessing` for parallel; `pyopencl` for GPU.
 - **R**: base R (+ `parallel`); the CRAN package `OpenCL` for GPU. Loop tests run inside
   functions so R byte-compiles them.
-- **Platform**: Linux only (the programs read `/proc` and `/sys`).
-- **JavaScript**: Node.js (e.g. installed with nvm), run as `node --expose-gc`; ES module; standard
+- **Platform**: Linux (the programs read `/proc` and `/sys`) and Windows 10/11 x64 (registry and Win32
+  API; `run_all.ps1`). Windows C++ build: MinGW-w64 g++ (e.g. from Rtools) with the same flags plus
+  `-Wa,-muse-unaligned-vector-move` (GCC cannot align the Windows stack to 32 bytes, so AVX spills must
+  use unaligned moves), linked to the OpenBLAS DLL (copied next to the program) and to the OpenCL SDK's
+  import library; the GPU driver's `OpenCL.dll` is used at run time. R for Windows uses its bundled
+  reference BLAS (`Rblas.dll`, one thread) unless it has been replaced; `blas` names that file.
+- **JavaScript**: Node.js (e.g. installed with nvm, or the Windows installer), run as `node --expose-gc`; ES module; standard
   library only, except two npm packages (in `JavaScript/package.json`): `webgpu` for the GPU and
   `koffi` to call OpenBLAS. If one is missing (or no GPU adapter is found), skip the affected tests
   with the reason.

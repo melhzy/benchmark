@@ -1,0 +1,6 @@
+# Same line endings on every OS: LF everywhere (bash needs it for run_all.sh, and suite_tests_sha hashes
+# tests.csv and the kernels byte for byte), except Windows batch files, which need CRLF.
+* text=auto eol=lf
+*.cmd text eol=crlf
+*.png binary
+*.ipynb text eol=lf

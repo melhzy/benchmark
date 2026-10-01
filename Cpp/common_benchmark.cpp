@@ -1,6 +1,7 @@
 // common_benchmark.cpp -- C++ implementation of the common benchmark (see ../common/SPEC.md).
 //
-// Build   make                      (in this folder; see Makefile)
+// Build   make                      (in this folder; see Makefile. Windows: MinGW-w64 g++ and make,
+//                                    e.g. from Rtools; run_all.ps1 builds it)
 // Usage   ./common_benchmark                    full run
 //         ./common_benchmark --quick            smaller sizes, quick check
 //         ./common_benchmark --verify           tiny identical sizes, for comparing checksums
@@ -35,7 +36,19 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+
+#ifdef _WIN32
+#ifndef _WIN32_WINNT
+#define _WIN32_WINNT 0x0A00
+#endif
+#define WIN32_LEAN_AND_MEAN
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#else
 #include <unistd.h>
+#endif
 
 #ifndef NO_OPENCL
 #define CL_TARGET_OPENCL_VERSION 120
@@ -79,6 +92,11 @@ inline double w2(size_t i) { return frac((double)i * PHI2); }
 static std::string trim(const std::string& s) {
     size_t a = s.find_first_not_of(" \t\r\n"), b = s.find_last_not_of(" \t\r\n");
     return a == std::string::npos ? "" : s.substr(a, b - a + 1);
+}
+
+static std::string lower_ascii(std::string s) {
+    for (char& c : s) c = (char)std::tolower((unsigned char)c);
+    return s;
 }
 
 static std::vector<std::string> split(const std::string& s, char sep) {
@@ -151,8 +169,85 @@ static double median(std::vector<double> v) {
 }
 
 // ---------------------------------------------------------------------------
-// System information (Linux)
+// System information (Linux: /proc and /sys; Windows: registry and Win32 API)
 // ---------------------------------------------------------------------------
+
+#ifdef _WIN32
+
+static std::string reg_string(const char* key, const char* value) {
+    char buf[512];
+    DWORD size = sizeof buf;
+    if (RegGetValueA(HKEY_LOCAL_MACHINE, key, value, RRF_RT_REG_SZ, nullptr, buf, &size) != ERROR_SUCCESS) return "";
+    return trim(buf);
+}
+
+static std::string cpu_model() {
+    return reg_string("HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0", "ProcessorNameString");
+}
+
+static int logical_cpus() { return (int)GetActiveProcessorCount(ALL_PROCESSOR_GROUPS); }
+
+static int physical_cores() {
+    DWORD len = 0;
+    GetLogicalProcessorInformationEx(RelationProcessorCore, nullptr, &len);
+    std::vector<char> buf(len);
+    if (!len || !GetLogicalProcessorInformationEx(RelationProcessorCore,
+            reinterpret_cast<SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*>(buf.data()), &len))
+        return logical_cpus();
+    int cores = 0;
+    for (DWORD off = 0; off < len; ++cores)
+        off += reinterpret_cast<SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*>(buf.data() + off)->Size;
+    return cores;
+}
+
+static double ram_total_kib() {
+    MEMORYSTATUSEX m{sizeof m};
+    return GlobalMemoryStatusEx(&m) ? m.ullTotalPhys / 1024.0 : 0;
+}
+
+static double ram_available_kib() {
+    MEMORYSTATUSEX m{sizeof m};
+    return GlobalMemoryStatusEx(&m) ? m.ullAvailPhys / 1024.0 : 0;
+}
+
+static std::string power_source() {
+    SYSTEM_POWER_STATUS s;
+    if (!GetSystemPowerStatus(&s)) return "";
+    return s.ACLineStatus == 1 || s.BatteryFlag == 128 ? "AC" : "battery";   // 128 = no battery
+}
+
+// The Windows "power mode" (Settings > System > Power) for the current power source.
+static std::string platform_profile() {
+    const char* key = "SYSTEM\\CurrentControlSet\\Control\\Power\\User\\PowerSchemes";
+    std::string guid = lower_ascii(reg_string(key, power_source() == "AC" ? "ActiveOverlayAcPowerScheme"
+                                                                         : "ActiveOverlayDcPowerScheme"));
+    if (guid == "961cc777-2547-4f9d-8174-7d86181b8a7a") return "best power efficiency";
+    if (guid == "00000000-0000-0000-0000-000000000000") return "balanced";
+    if (guid == "ded574b5-45a0-4f42-8737-46345c09c238") return "best performance";
+    return guid;
+}
+
+// Windows has no CPU temperature sensor that programs can read without administrator rights.
+static std::string cpu_temp_c() { return ""; }
+
+static std::string hostname() {
+    char buf[MAX_COMPUTERNAME_LENGTH + 1] = {0};
+    DWORD n = sizeof buf;
+    GetComputerNameA(buf, &n);
+    return buf;
+}
+
+static std::string firmware_vendor() { return reg_string("HARDWARE\\DESCRIPTION\\System\\BIOS", "SystemManufacturer"); }
+static std::string firmware_product() { return reg_string("HARDWARE\\DESCRIPTION\\System\\BIOS", "SystemProductName"); }
+
+static fs::path self_exe() {
+    std::wstring buf(32768, L'\0');
+    DWORD n = GetModuleFileNameW(nullptr, buf.data(), (DWORD)buf.size());
+    buf.resize(n);
+    return fs::path(buf);
+}
+
+#else  // Linux
 
 static std::string cpu_model() {
     std::istringstream f(read_text("/proc/cpuinfo"));
@@ -186,12 +281,17 @@ static double meminfo_kib(const std::string& key) {
     return 0;
 }
 
+static double ram_total_kib() { return meminfo_kib("MemTotal"); }
+static double ram_available_kib() { return meminfo_kib("MemAvailable"); }
+
 static std::string power_source() {
     std::error_code ec;
     for (auto& e : fs::directory_iterator("/sys/class/power_supply", ec))
         if (read_line1((e.path() / "online").string()) == "1") return "AC";
     return "battery";
 }
+
+static std::string platform_profile() { return read_line1("/sys/firmware/acpi/platform_profile"); }
 
 // CPU temperature from the first hwmon sensor of a known CPU driver, in order of preference.
 static std::string cpu_temp_c() {
@@ -212,6 +312,12 @@ static std::string hostname() {
     return buf;
 }
 
+static std::string firmware_vendor() { return read_line1("/sys/class/dmi/id/sys_vendor"); }
+static std::string firmware_product() { return read_line1("/sys/class/dmi/id/product_name"); }
+static fs::path self_exe() { return fs::canonical("/proc/self/exe"); }
+
+#endif  // _WIN32
+
 // lowercase; every run of characters outside [a-z0-9] becomes "-"; no "-" at either end.
 static std::string slug(const std::string& s) {
     std::string out;
@@ -224,24 +330,34 @@ static std::string slug(const std::string& s) {
     return out;
 }
 
-// Machine id (SPEC.md): BENCH_MACHINE, else the DMI vendor + product name, else the hostname.
+// Machine id (SPEC.md): BENCH_MACHINE, else the firmware (DMI / SMBIOS) vendor + product name, else the
+// hostname. The vendor is left out when the product name already starts with it.
 static std::string machine_id() {
     const char* env = std::getenv("BENCH_MACHINE");
     if (env && *env) return env;
-    std::string dmi = slug(trim(read_line1("/sys/class/dmi/id/sys_vendor")) + " " +
-                           trim(read_line1("/sys/class/dmi/id/product_name")));
+    const std::string vendor = trim(firmware_vendor()), product = trim(firmware_product());
+    const std::string v = slug(vendor), p = slug(product);
+    std::string dmi = !v.empty() && (p == v || p.rfind(v + "-", 0) == 0) ? p : slug(vendor + " " + product);
     return dmi.empty() ? slug(hostname()) : dmi;
 }
 
-// Replaces the user's home directory prefix with "~", so no personal paths end up in results.
+// Replaces the user's home directory with "~", so no personal paths end up in results.
+// (Windows: %USERPROFILE%, written with \ or /; Git Bash and MSYS2 also set HOME.)
 static std::string tilde(std::string s) {
-    const char* home = std::getenv("HOME");
-    if (!home || !*home || std::string(home) == "/") return s;
-    const std::string h = home;
-    for (size_t pos = 0; (pos = s.find(h, pos)) != std::string::npos;) {
-        s.replace(pos, h.size(), "~");
-        pos += 1;
+    std::vector<std::string> homes;
+    for (const char* var : {"HOME", "USERPROFILE"}) {
+        const char* h = std::getenv(var);
+        if (!h || !*h || std::string(h) == "/") continue;
+        std::string back = h, fwd = h;
+        std::replace(back.begin(), back.end(), '/', '\\');
+        std::replace(fwd.begin(), fwd.end(), '\\', '/');
+        homes.insert(homes.end(), {std::string(h), back, fwd});
     }
+    for (const std::string& h : homes)
+        for (size_t pos = 0; (pos = s.find(h, pos)) != std::string::npos;) {
+            s.replace(pos, h.size(), "~");
+            pos += 1;
+        }
     return s;
 }
 
@@ -567,7 +683,7 @@ static void t_mem_gather(Bench& b, const TestDef& t) {
 }
 
 static void t_mem_alloc(Bench& b, const TestDef& t) {
-    double avail = meminfo_kib("MemAvailable") * 1024.0;
+    double avail = ram_available_kib() * 1024.0;
     for (const std::string& g : split(t.size, ';')) {
         double G = std::stod(g), bytes = G * 1073741824.0;
         if (bytes > 0.4 * avail) {
@@ -674,11 +790,6 @@ static std::string device_str(cl_device_id d, cl_device_info what) {
     return trim(s.c_str());
 }
 
-static std::string lower(std::string s) {
-    for (char& c : s) c = (char)std::tolower((unsigned char)c);
-    return s;
-}
-
 // Opens a GPU device and builds kernels.cl. Throws with the reason.
 // Device: the first GPU (over all platforms) whose name contains BENCH_GPU (case-insensitive),
 // or simply the first GPU when BENCH_GPU is unset.
@@ -689,7 +800,7 @@ static std::unique_ptr<Gpu> open_gpu(const std::string& kernels_path) {
     std::vector<cl_platform_id> plats(np);
     CL_OK(clGetPlatformIDs(np, plats.data(), nullptr));
     const char* want_env = std::getenv("BENCH_GPU");
-    const std::string want = want_env ? lower(want_env) : "";
+    const std::string want = want_env ? lower_ascii(want_env) : "";
     auto g = std::make_unique<Gpu>();
     std::vector<std::string> seen;
     for (cl_platform_id p : plats) {
@@ -700,7 +811,7 @@ static std::unique_ptr<Gpu> open_gpu(const std::string& kernels_path) {
         for (cl_device_id d : devs) {
             std::string name = device_str(d, CL_DEVICE_NAME);
             seen.push_back(name);
-            if (!g->dev && (want.empty() || lower(name).find(want) != std::string::npos)) {
+            if (!g->dev && (want.empty() || lower_ascii(name).find(want) != std::string::npos)) {
                 g->dev = d;
                 g->info.platform = platform_str(p, CL_PLATFORM_NAME);
             }
@@ -739,6 +850,18 @@ static std::unique_ptr<Gpu> open_gpu(const std::string& kernels_path) {
         throw std::runtime_error("kernel build failed: " + trim(log.c_str()));
     }
     return g;
+}
+
+// Untimed, before the first GPU test: fma_peak back to back for `seconds`, so a GPU that idles at a low
+// clock (NVIDIA laptop GPUs do) is at its working clock when timing starts (SPEC section 4, gpu).
+static void gpu_warmup(Gpu& g, double seconds) {
+    const size_t n = size_t(1) << 20;
+    ClMem out(g.buffer(n * sizeof(float)));
+    ClKernel k(g.kernel("fma_peak"));
+    cl_uint nu = (cl_uint)n;
+    CL_OK(clSetKernelArg(k.k, 0, sizeof(cl_mem), &out.m));
+    CL_OK(clSetKernelArg(k.k, 1, sizeof(cl_uint), &nu));
+    for (auto t0 = Clock::now(); std::chrono::duration<double>(Clock::now() - t0).count() < seconds;) g.run(k.k, n);
 }
 
 static void t_gpu_fp32_peak(Bench& b, Gpu& g, const TestDef& t) {
@@ -832,7 +955,9 @@ static void usage() {
 }
 
 int main(int argc, char** argv) {
+#ifndef _WIN32
     setenv("RUSTICL_ENABLE", "radeonsi,iris", 0);  // let Mesa's rusticl expose AMD and Intel GPUs
+#endif
 
     std::string mode = "full", only, out;
     for (int i = 1; i < argc; ++i) {
@@ -845,7 +970,7 @@ int main(int argc, char** argv) {
         else { std::fprintf(stderr, "unknown argument: %s\n", a.c_str()); usage(); return 2; }
     }
 
-    fs::path root = fs::canonical("/proc/self/exe").parent_path().parent_path();
+    fs::path root = self_exe().parent_path().parent_path();
     std::vector<TestDef> tests;
     try {
         tests = load_tests((root / "common" / "tests.csv").string(), mode);
@@ -883,7 +1008,7 @@ int main(int argc, char** argv) {
     const std::string blas = trim(openblas_get_config());
 #else
     const std::string blas = "none";
-    const std::string blas_skip = "OpenBLAS not found at build time (install libopenblas, or make OPENBLAS=...)";
+    const std::string blas_skip = "OpenBLAS not found at build time (install it - README, Setup - or make OPENBLAS=...)";
 #endif
 
     // GPU: opened up front (if any GPU test is selected) so the header can show the device.
@@ -901,7 +1026,7 @@ int main(int argc, char** argv) {
         }
     }
 #else
-    gpu_skip = "built without OpenCL headers (install opencl-headers, then run make)";
+    gpu_skip = "built without OpenCL headers (install them - README, Setup - then run make)";
 #endif
 
     std::printf("C++ common benchmark\n");
@@ -944,6 +1069,8 @@ int main(int argc, char** argv) {
     };
 #endif
 
+    bool gpu_warm = false;
+    (void)gpu_warm;
     for (const TestDef& t : tests) {
         try {
             if (t.category == "gpu") {
@@ -955,6 +1082,12 @@ int main(int argc, char** argv) {
 #ifndef NO_OPENCL
                 auto it = gpu_tests.find(t.test);
                 if (it == gpu_tests.end()) throw std::runtime_error("not implemented");
+                if (!gpu_warm && mode != "verify") {
+                    std::printf("  %-11s %-30s %s\n", "gpu", "warm-up", "2 s of fma_peak, not timed");
+                    std::fflush(stdout);
+                    gpu_warmup(*gpu, 2.0);
+                }
+                gpu_warm = true;
                 it->second(b, *gpu, t);
 #endif
             } else {
@@ -1008,9 +1141,9 @@ int main(int argc, char** argv) {
         {"cpu", cpu_model()},
         {"physical_cores", std::to_string(b.phys)},
         {"logical_cpus", std::to_string(b.logical)},
-        {"ram_gib", num(meminfo_kib("MemTotal") / 1048576.0, 4)},
+        {"ram_gib", num(ram_total_kib() / 1048576.0, 4)},
         {"power", power_source()},
-        {"platform_profile", read_line1("/sys/firmware/acpi/platform_profile")},
+        {"platform_profile", platform_profile()},
         {"cpu_temp_start_c", temp_start},
         {"cpu_temp_end_c", temp_end},
         {"started", started},
@@ -1030,7 +1163,7 @@ int main(int argc, char** argv) {
     for (auto& [k, v] : meta) mf << k << ',' << csv_field(tilde(v)) << '\n';
     mf.close();
 
-    std::printf("\nFinished in %.1f s (CPU %s C -> %s C)\nSaved %s\n", elapsed, temp_start.c_str(),
-                temp_end.c_str(), tilde(res_path.string()).c_str());
+    const std::string temps = temp_start.empty() ? "" : " (CPU " + temp_start + " C -> " + temp_end + " C)";
+    std::printf("\nFinished in %.1f s%s\nSaved %s\n", elapsed, temps.c_str(), tilde(res_path.string()).c_str());
     return 0;
 }

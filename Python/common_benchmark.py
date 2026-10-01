@@ -52,8 +52,11 @@ META_KEYS = ["run_id", "batch", "language", "mode", "language_version", "build",
 
 
 # ---------------------------------------------------------------------------
-# System information
+# System information (Linux: /proc and /sys; Windows: registry and Win32 API through ctypes)
 # ---------------------------------------------------------------------------
+
+WINDOWS = sys.platform == "win32"
+
 
 def _read(path):
     try:
@@ -63,17 +66,61 @@ def _read(path):
         return None
 
 
+def _reg(key, value):
+    """A string value under HKEY_LOCAL_MACHINE (Windows), or None."""
+    import winreg
+    try:
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key) as k:
+            return str(winreg.QueryValueEx(k, value)[0]).strip()
+    except OSError:
+        return None
+
+
+def cpu_model():
+    if WINDOWS:
+        return _reg(r"HARDWARE\DESCRIPTION\System\CentralProcessor\0", "ProcessorNameString") or platform.processor()
+    return (cpuinfo_field("model name") or [platform.processor()])[0]
+
+
 def cpuinfo_field(key):
     return [line.split(":", 1)[1].strip() for line in (_read("/proc/cpuinfo") or "").splitlines()
             if line.split(":", 1)[0].strip() == key]
 
 
 def physical_cores():
+    if WINDOWS:
+        import ctypes
+        k32 = ctypes.windll.kernel32
+        size = ctypes.c_ulong(0)
+        k32.GetLogicalProcessorInformationEx(0, None, ctypes.byref(size))      # 0 = RelationProcessorCore
+        buf = ctypes.create_string_buffer(size.value)
+        if size.value and k32.GetLogicalProcessorInformationEx(0, buf, ctypes.byref(size)):
+            cores, off = 0, 0
+            while off < size.value:      # variable-size records: DWORD Relationship, DWORD Size, ...
+                off += int.from_bytes(buf.raw[off + 4:off + 8], "little")
+                cores += 1
+            return cores
+        return os.cpu_count()
     pairs = set(zip(cpuinfo_field("physical id"), cpuinfo_field("core id")))
     return len(pairs) or os.cpu_count()
 
 
 def meminfo_kib(key):
+    """MemTotal / MemAvailable in KiB (/proc/meminfo; Windows: GlobalMemoryStatusEx)."""
+    if WINDOWS:
+        import ctypes
+
+        class MemoryStatusEx(ctypes.Structure):
+            _fields_ = [("dwLength", ctypes.c_ulong), ("dwMemoryLoad", ctypes.c_ulong),
+                        ("ullTotalPhys", ctypes.c_ulonglong), ("ullAvailPhys", ctypes.c_ulonglong),
+                        ("ullTotalPageFile", ctypes.c_ulonglong), ("ullAvailPageFile", ctypes.c_ulonglong),
+                        ("ullTotalVirtual", ctypes.c_ulonglong), ("ullAvailVirtual", ctypes.c_ulonglong),
+                        ("ullAvailExtendedVirtual", ctypes.c_ulonglong)]
+        m = MemoryStatusEx()
+        m.dwLength = ctypes.sizeof(m)
+        if not ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(m)):
+            return None
+        return {"MemTotal": m.ullTotalPhys, "MemAvailable": m.ullAvailPhys}[key] // 1024
     for line in (_read("/proc/meminfo") or "").splitlines():
         if line.startswith(key + ":"):
             return int(line.split()[1])
@@ -81,14 +128,40 @@ def meminfo_kib(key):
 
 
 def power_source():
+    if WINDOWS:
+        import ctypes
+
+        class PowerStatus(ctypes.Structure):
+            _fields_ = [("ACLineStatus", ctypes.c_ubyte), ("BatteryFlag", ctypes.c_ubyte),
+                        ("BatteryLifePercent", ctypes.c_ubyte), ("SystemStatusFlag", ctypes.c_ubyte),
+                        ("BatteryLifeTime", ctypes.c_ulong), ("BatteryFullLifeTime", ctypes.c_ulong)]
+        s = PowerStatus()
+        if not ctypes.windll.kernel32.GetSystemPowerStatus(ctypes.byref(s)):
+            return ""
+        return "AC" if s.ACLineStatus == 1 or s.BatteryFlag == 128 else "battery"   # 128 = no battery
     online = [_read(p) for p in Path("/sys/class/power_supply").glob("*/online")]
     return "AC" if "1" in online else "battery"
+
+
+WINDOWS_POWER_MODES = {"961cc777-2547-4f9d-8174-7d86181b8a7a": "best power efficiency",
+                       "00000000-0000-0000-0000-000000000000": "balanced",
+                       "ded574b5-45a0-4f42-8737-46345c09c238": "best performance"}
+
+
+def platform_profile():
+    """ACPI platform profile (Linux), or the Windows power mode for the current power source."""
+    if WINDOWS:
+        value = "ActiveOverlayAcPowerScheme" if power_source() == "AC" else "ActiveOverlayDcPowerScheme"
+        guid = (_reg(r"SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes", value) or "").lower()
+        return WINDOWS_POWER_MODES.get(guid, guid)
+    return _read("/sys/firmware/acpi/platform_profile")
 
 
 CPU_SENSORS = ("k10temp", "zenpower", "coretemp", "cpu_thermal")   # in order of preference
 
 
 def cpu_temp_c():
+    """CPU temperature (Linux hwmon). Windows has no sensor readable without administrator rights."""
     hwmons = sorted(Path("/sys/class/hwmon").glob("hwmon*"))
     for want in CPU_SENSORS:
         for hwmon in hwmons:
@@ -111,18 +184,28 @@ def slug(text):
 
 
 def machine_id():
-    """BENCH_MACHINE, else the DMI vendor + product name, else the hostname (SPEC.md)."""
+    """BENCH_MACHINE, else the firmware (DMI / SMBIOS) vendor + product name, else the hostname (SPEC.md).
+    The vendor is left out when the product name already starts with it."""
     if os.environ.get("BENCH_MACHINE"):
         return os.environ["BENCH_MACHINE"]
-    dmi = slug(f"{_read('/sys/class/dmi/id/sys_vendor') or ''} {_read('/sys/class/dmi/id/product_name') or ''}")
+    if WINDOWS:
+        bios = r"HARDWARE\DESCRIPTION\System\BIOS"
+        vendor, product = _reg(bios, "SystemManufacturer") or "", _reg(bios, "SystemProductName") or ""
+    else:
+        vendor, product = _read("/sys/class/dmi/id/sys_vendor") or "", _read("/sys/class/dmi/id/product_name") or ""
+    v, p = slug(vendor), slug(product)
+    dmi = p if v and (p == v or p.startswith(v + "-")) else slug(f"{vendor} {product}")
     return dmi or slug(platform.node())
 
 
 def tilde(value):
     """Replace the user's home directory with "~", so no personal paths end up in results."""
-    home = os.path.expanduser("~")
     text = str(value)
-    return text.replace(home, "~") if home and home != "/" else text
+    homes = {os.path.expanduser("~"), os.environ.get("USERPROFILE", ""), os.environ.get("HOME", "")}
+    for home in sorted({h for h in homes if h and h != "/"} |
+                       {h.replace("\\", "/") for h in homes if h and h != "/"}, key=len, reverse=True):
+        text = text.replace(home, "~")
+    return text
 
 
 def blas_info():
@@ -137,8 +220,11 @@ def blas_info():
 def blas_threads():
     """Thread count of the OpenBLAS bundled with NumPy (falls back to the CPU count)."""
     import ctypes
-    paths = {line.split()[-1] for line in (_read("/proc/self/maps") or "").splitlines()
-             if "openblas" in line and line.split()[-1].startswith("/")}
+    if WINDOWS:   # NumPy's wheels keep their DLLs in site-packages/numpy.libs
+        paths = {str(p) for p in (Path(np.__file__).parent.parent / "numpy.libs").glob("*openblas*.dll")}
+    else:
+        paths = {line.split()[-1] for line in (_read("/proc/self/maps") or "").splitlines()
+                 if "openblas" in line and line.split()[-1].startswith("/")}
     for path in paths:
         lib = ctypes.CDLL(path)
         for name in ("scipy_openblas_get_num_threads64_", "openblas_get_num_threads64_",
@@ -161,7 +247,7 @@ def weyl(n, start=0, mult=PHI):
 
 # ---------------------------------------------------------------------------
 # Workloads. Each setup returns (run, check, work); run() is timed, check(result) is not.
-# Worker functions are top-level so multiprocessing (forkserver) can import them.
+# Worker functions are top-level so multiprocessing (forkserver on Linux, spawn on Windows) can import them.
 # ---------------------------------------------------------------------------
 
 def mandel_rows(span):
@@ -369,6 +455,15 @@ class Gpu:
         self.cl.enqueue_copy(self.queue, host, buf, src_offset=4 * first, is_blocking=True)
         return host
 
+    def warmup(self, seconds):
+        """Untimed, before the first GPU test: fma_peak back to back, so a GPU that idles at a low clock
+        (NVIDIA laptop GPUs do) is at its working clock when timing starts (SPEC section 4, gpu)."""
+        n = 1 << 20
+        out = self._buffer(n * 4)
+        t0 = time.perf_counter()
+        while time.perf_counter() - t0 < seconds:
+            self._launch("fma_peak", n, out, np.uint32(n))
+
     def setup_fp32_peak(self, n):
         n = int(n)
         out = self._buffer(n * 4)
@@ -457,8 +552,8 @@ class Runner:
         self.csv_path = self.out_dir / f"{self.run_id}.csv"
         self.meta_path = self.out_dir / f"{self.run_id}_meta.csv"
         self.skipped, self.failed = [], []
-        self.gpu, self.gpu_error = None, None
-        self._file = open(self.csv_path, "w", newline="")
+        self.gpu, self.gpu_error, self.gpu_warm = None, None, False
+        self._file = open(self.csv_path, "w", newline="", encoding="utf-8")
         self._writer = csv.writer(self._file)
         self._writer.writerow(RESULT_COLUMNS)
 
@@ -552,6 +647,10 @@ class Runner:
                 self.skipped.append(f"{test}: {self.gpu_error}")
                 print(f"  {spec['category']:<11} {test:<26} skipped ({self.gpu_error})")
                 return
+            if not self.gpu_warm and self.mode != "verify":
+                print(f"  {'gpu':<11} {'warm-up':<26} 2 s of fma_peak, not timed", flush=True)
+                self.gpu.warmup(2.0)
+            self.gpu_warm = True
             setup = getattr(self.gpu, GPU_SETUPS[test])(size)
             return self.measure(spec, setup, 0, size)
         threads = blas_threads() if test == "matmul_blas" else 1
@@ -564,10 +663,10 @@ class Runner:
             "run_id": self.run_id, "batch": self.batch, "language": "Python", "mode": self.mode,
             "language_version": f"{platform.python_implementation()} {platform.python_version()}",
             "build": sys.executable, "blas": blas_info(), "numpy_version": np.__version__,
-            "cpu": (cpuinfo_field("model name") or [platform.processor()])[0],
+            "cpu": cpu_model(),
             "physical_cores": physical_cores(), "logical_cpus": os.cpu_count(),
             "ram_gib": round(mem_kib / 2**20, 1) if mem_kib else "",
-            "power": power_source(), "platform_profile": _read("/sys/firmware/acpi/platform_profile"),
+            "power": power_source(), "platform_profile": platform_profile(),
             "cpu_temp_start_c": self.temp_start, "cpu_temp_end_c": temp_end,
             "started": self.started.isoformat(timespec="seconds"), "elapsed_s": round(elapsed, 3),
             "host": self.machine, "machine": self.machine,
@@ -575,7 +674,7 @@ class Runner:
         }
         if self.gpu:
             meta.update(self.gpu.info())
-        with open(self.meta_path, "w", newline="") as f:
+        with open(self.meta_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
             writer.writerow(["key", "value"])
             for key in META_KEYS:
@@ -593,10 +692,10 @@ class Runner:
             ("Python", f"{platform.python_implementation()} {platform.python_version()} ({tilde(sys.executable)})"),
             ("Machine", self.machine),
             ("NumPy", f"{np.__version__}; {blas_info()}"),
-            ("CPU", f"{(cpuinfo_field('model name') or ['?'])[0]}, "
+            ("CPU", f"{cpu_model() or '?'}, "
                     f"{physical_cores()} physical / {os.cpu_count()} logical"),
             ("GPU", gpu_text),
-            ("Power", f"{power_source()}, profile {_read('/sys/firmware/acpi/platform_profile')}"),
+            ("Power", f"{power_source()}, profile {platform_profile()}"),
             ("CPU temp", f"{self.temp_start:.0f} C" if self.temp_start is not None else "?"),
             ("Mode", self.mode),
             ("Output", tilde(self.csv_path)),
@@ -625,7 +724,7 @@ class Runner:
 
 
 def load_tests():
-    with open(TESTS_CSV, newline="") as f:
+    with open(TESTS_CSV, newline="", encoding="utf-8") as f:
         return list(csv.DictReader(f))
 
 

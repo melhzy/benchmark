@@ -15,25 +15,42 @@ import argparse
 import csv
 import glob
 import math
-import re
 import os
+import platform
+import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
+def slug(text):
+    return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+
+
 def machine_id():
     """This computer's results folder name; the same rule as the benchmark programs (common/SPEC.md)."""
     name = os.environ.get("BENCH_MACHINE", "").strip()
-    if not name:
-        parts = []
-        for f in ("/sys/class/dmi/id/sys_vendor", "/sys/class/dmi/id/product_name"):
+    if name:
+        return slug(name)
+    vendor = product = ""
+    if sys.platform == "win32":
+        import winreg
+        try:
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"HARDWARE\DESCRIPTION\System\BIOS") as k:
+                vendor = str(winreg.QueryValueEx(k, "SystemManufacturer")[0])
+                product = str(winreg.QueryValueEx(k, "SystemProductName")[0])
+        except OSError:
+            pass
+    else:
+        for f in ("sys_vendor", "product_name"):
             try:
-                parts.append(open(f).read().strip())
+                with open(f"/sys/class/dmi/id/{f}") as fh:
+                    value = fh.read().strip()
             except OSError:
-                parts.append("")
-        name = " ".join(parts).strip() or os.uname().nodename
-    return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+                value = ""
+            vendor, product = (value, product) if f == "sys_vendor" else (vendor, value)
+    v, p = slug(vendor), slug(product)
+    return (p if v and (p == v or p.startswith(v + "-")) else slug(f"{vendor} {product}")) or slug(platform.node())
 
 # Relative tolerance per test. Integer results must match exactly; floating-point sums may
 # differ in the last digits because languages add numbers in different orders.
@@ -56,7 +73,7 @@ def load(directory, batch):
         name = os.path.basename(path)
         if name.endswith("_meta.csv") or name.startswith("sensors_"):
             continue
-        with open(path, newline="") as f:
+        with open(path, newline="", encoding="utf-8") as f:
             rows = list(csv.DictReader(f))
         if not rows or rows[0].get("mode") != "verify":
             continue
@@ -82,7 +99,7 @@ def intended_skips(directory, run_ids):
         path = os.path.join(directory, f"{run_id}_meta.csv")
         if not os.path.exists(path):
             continue
-        with open(path, newline="") as f:
+        with open(path, newline="", encoding="utf-8") as f:
             meta = {r["key"]: r["value"] for r in csv.DictReader(f)}
         tests = {item.split(":")[0].strip() for item in meta.get("skipped", "").split(";") if ":" in item}
         skips.setdefault(meta.get("language", ""), set()).update(tests)

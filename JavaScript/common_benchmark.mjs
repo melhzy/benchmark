@@ -3,12 +3,12 @@
 //
 // Implements common/SPEC.md: the same tests, sizes (common/tests.csv) and output format as the
 // C++, Python and R versions, so all four can be compared in analysis.ipynb.
-// GPU tests use WebGPU (npm package `webgpu`, Google's Dawn on Vulkan) with common/kernels.wgsl,
+// GPU tests use WebGPU (npm package `webgpu`, Google's Dawn on Vulkan / D3D12) with common/kernels.wgsl,
 // a line-by-line translation of the OpenCL kernels the other languages use.
 // matmul_blas calls the system OpenBLAS (the same library C++ and R use) through the npm package
 // `koffi` (a foreign-function interface), since Node.js has no BLAS of its own.
 //
-// Setup (once):   cd ~/benchmark/JavaScript && npm install
+// Setup (once):   cd JavaScript && npm install
 // Usage
 //   node --expose-gc common_benchmark.mjs                 full run
 //   node --expose-gc common_benchmark.mjs --quick         smaller sizes, quick check
@@ -23,6 +23,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, openSy
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Worker, isMainThread, parentPort } from 'node:worker_threads';
+import { execFileSync } from 'node:child_process';
 import os from 'node:os';
 
 const SCRIPT = fileURLToPath(import.meta.url);
@@ -74,20 +75,47 @@ function mandelRows(y0, y1, W) {
 }
 
 // ---------------------------------------------------------------------------
-// System information
+// System information (Linux: /proc and /sys; Windows: one PowerShell query, plus Node's os module)
 // ---------------------------------------------------------------------------
+
+const WINDOWS = process.platform === 'win32';
 
 function readText(path) {
   try { return readFileSync(path, 'utf8').trim(); } catch { return null; }
 }
 
+// Windows: the facts Node cannot read itself, from one PowerShell call (about a second), cached.
+let winInfo = null;
+function windowsInfo() {
+  if (winInfo) return winInfo;
+  const script = [
+    'Add-Type -AssemblyName System.Windows.Forms',
+    "$bios = Get-ItemProperty 'HKLM:\\HARDWARE\\DESCRIPTION\\System\\BIOS'",
+    "$pw = Get-ItemProperty 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Power\\User\\PowerSchemes'",
+    '[pscustomobject]@{ vendor = "$($bios.SystemManufacturer)".Trim(); product = "$($bios.SystemProductName)".Trim();',
+    '  cores = [int](Get-CimInstance Win32_Processor | Measure-Object -Property NumberOfCores -Sum).Sum;',
+    '  power = "$([System.Windows.Forms.SystemInformation]::PowerStatus.PowerLineStatus)";',
+    '  overlayAc = "$($pw.ActiveOverlayAcPowerScheme)"; overlayDc = "$($pw.ActiveOverlayDcPowerScheme)" } | ConvertTo-Json -Compress',
+  ].join('\n');
+  try {
+    const encoded = Buffer.from(script, 'utf16le').toString('base64');   // -EncodedCommand: no quoting issues
+    winInfo = JSON.parse(execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', encoded],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }));
+  } catch {
+    winInfo = {};
+  }
+  return winInfo;
+}
+
 function cpuinfoField(key) {
+  if (WINDOWS) return key === 'model name' && os.cpus().length ? [os.cpus()[0].model.trim()] : [];
   return (readText('/proc/cpuinfo') || '').split('\n')
     .filter((line) => line.split(':')[0].trim() === key)
     .map((line) => line.slice(line.indexOf(':') + 1).trim());
 }
 
 function physicalCores() {
+  if (WINDOWS) return windowsInfo().cores || os.cpus().length;
   const ids = cpuinfoField('physical id'), cores = cpuinfoField('core id');
   const pairs = new Set(cores.map((c, i) => `${ids[i]}/${c}`));
   return pairs.size || os.cpus().length;
@@ -98,6 +126,7 @@ function logicalCpus() {
 }
 
 function meminfoKib(key) {
+  if (WINDOWS) return Math.floor((key === 'MemTotal' ? os.totalmem() : os.freemem()) / 1024);  // freemem = available
   for (const line of (readText('/proc/meminfo') || '').split('\n')) {
     if (line.startsWith(key + ':')) return Number(line.split(/\s+/)[1]);
   }
@@ -105,10 +134,27 @@ function meminfoKib(key) {
 }
 
 function powerSource() {
+  if (WINDOWS) return windowsInfo().power ? (windowsInfo().power === 'Offline' ? 'battery' : 'AC') : '';
   const base = '/sys/class/power_supply';
   if (!existsSync(base)) return '';
   const online = readdirSync(base).some((name) => readText(`${base}/${name}/online`) === '1');
   return online ? 'AC' : 'battery';
+}
+
+const WINDOWS_POWER_MODES = {
+  '961cc777-2547-4f9d-8174-7d86181b8a7a': 'best power efficiency',
+  '00000000-0000-0000-0000-000000000000': 'balanced',
+  'ded574b5-45a0-4f42-8737-46345c09c238': 'best performance',
+};
+
+// ACPI platform profile (Linux), or the Windows power mode for the current power source.
+function platformProfile() {
+  if (WINDOWS) {
+    const i = windowsInfo();
+    const guid = String((powerSource() === 'battery' ? i.overlayDc : i.overlayAc) || '').toLowerCase();
+    return WINDOWS_POWER_MODES[guid] || guid;
+  }
+  return readText('/sys/firmware/acpi/platform_profile') || '';
 }
 
 // CPU temperature from the first hwmon sensor of a known CPU driver, in order of preference.
@@ -132,19 +178,25 @@ function cpuTempC() {
 // lowercase; every run of characters outside [a-z0-9] becomes "-"; no "-" at either end.
 const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 
-// Machine id (SPEC.md): BENCH_MACHINE, else the DMI vendor + product name, else the hostname.
+// Machine id (SPEC.md): BENCH_MACHINE, else the firmware (DMI / SMBIOS) vendor + product name, else the
+// hostname. The vendor is left out when the product name already starts with it.
 function machineId() {
   if (process.env.BENCH_MACHINE) return process.env.BENCH_MACHINE;
-  const dmi = slug(`${(readText('/sys/class/dmi/id/sys_vendor') || '').trim()} ` +
-                   `${(readText('/sys/class/dmi/id/product_name') || '').trim()}`);
+  const vendor = WINDOWS ? windowsInfo().vendor || '' : (readText('/sys/class/dmi/id/sys_vendor') || '').trim();
+  const product = WINDOWS ? windowsInfo().product || '' : (readText('/sys/class/dmi/id/product_name') || '').trim();
+  const v = slug(vendor), p = slug(product);
+  const dmi = v && (p === v || p.startsWith(`${v}-`)) ? p : slug(`${vendor} ${product}`);
   return dmi || slug(os.hostname());
 }
 
 // Replaces the user's home directory with "~", so no personal paths end up in results.
+// (Windows: the home folder written with \ and with /.)
 function tilde(value) {
+  let text = String(value);
   const home = os.homedir();
-  const text = String(value);
-  return home && home !== '/' ? text.split(home).join('~') : text;
+  if (!home || home === '/') return text;
+  for (const h of [...new Set([home, home.replace(/\\/g, '/')])]) text = text.split(h).join('~');
+  return text;
 }
 
 // ---------------------------------------------------------------------------
@@ -274,8 +326,14 @@ function setupMemGather(sizeMib) {
 
 // -- BLAS: the system OpenBLAS through koffi (FFI) ------------------------------------------
 // BENCH_OPENBLAS (full path), else the first library found in the usual Debian/Ubuntu, Fedora and
-// Arch locations (the same list as Cpp/Makefile).
-const OPENBLAS_CANDIDATES = [
+// Arch locations, or on Windows the DLL that setup_windows.ps1 installs (the same lists as Cpp/Makefile
+// and common/windows_tools.ps1).
+const OPENBLAS_CANDIDATES = WINDOWS ? [
+  join(ROOT, 'deps', 'openblas', 'bin', 'libopenblas.dll'),
+  'C:\\OpenBLAS\\bin\\libopenblas.dll',
+  'C:\\msys64\\ucrt64\\bin\\libopenblas.dll',
+  'C:\\msys64\\mingw64\\bin\\libopenblas.dll',
+] : [
   '/usr/lib/x86_64-linux-gnu/openblas-pthread/libopenblas.so.0',
   '/usr/lib/x86_64-linux-gnu/libopenblas.so.0',
   '/usr/lib/aarch64-linux-gnu/openblas-pthread/libopenblas.so.0',
@@ -295,7 +353,10 @@ function findOpenBlas() {
 
 async function loadBlas() {
   const path = findOpenBlas();
-  if (!path) throw new BlasMissing('OpenBLAS not found (install libopenblas, or set BENCH_OPENBLAS=/path/to/libopenblas.so.0)');
+  if (!path) {
+    throw new BlasMissing(WINDOWS ? 'OpenBLAS not found (run setup_windows.ps1, or set BENCH_OPENBLAS=C:\\path\\to\\libopenblas.dll)'
+      : 'OpenBLAS not found (install libopenblas, or set BENCH_OPENBLAS=/path/to/libopenblas.so.0)');
+  }
   const { default: koffi } = await import('koffi');
   const lib = koffi.load(path);
   const config = lib.func('const char *openblas_get_config()');
@@ -371,7 +432,7 @@ class Gpu {
   info() {
     const i = this.adapter.info;
     return {
-      gpu_platform: `WebGPU (npm webgpu ${this.webgpuVersion}, Dawn, Vulkan)`,
+      gpu_platform: `WebGPU (npm webgpu ${this.webgpuVersion}, Dawn, ${GPU_BACKEND})`,
       gpu_device: i.device || i.description || '',
       gpu_driver: i.description || '',
       gpu_compute_units: '',       // WebGPU does not expose these
@@ -441,6 +502,17 @@ class Gpu {
     const errors = [await this.device.popErrorScope(), await this.device.popErrorScope()].filter(Boolean);
     if (errors.length) throw new Error(`WebGPU: ${errors.map((e) => e.message).join('; ')}`);
     return result;
+  }
+
+  // Untimed, before the first GPU test: fma_peak back to back, so a GPU that idles at a low clock
+  // (NVIDIA laptop GPUs do) is at its working clock when timing starts (SPEC section 4, gpu).
+  async warmup(seconds) {
+    const n = 2 ** 20;
+    const out = this.storage(n * 4);
+    const run = this.kernel('fma_peak', [out, this.uniform([n])], n);
+    const t0 = performance.now();
+    while (performance.now() - t0 < seconds * 1000) await run();
+    out.destroy();
   }
 
   async setupFp32Peak(n) {
@@ -516,6 +588,9 @@ class Gpu {
     });
   }
 }
+
+// Dawn's native graphics API on each platform (it picks this backend by default).
+const GPU_BACKEND = { win32: 'D3D12', darwin: 'Metal' }[process.platform] || 'Vulkan';
 
 const GPU_SETUPS = {
   gpu_fp32_peak: 'setupFp32Peak', gpu_bandwidth: 'setupBandwidth', gpu_sgemm: 'setupSgemm',
@@ -719,6 +794,11 @@ class Runner {
     if (test in GPU_SETUPS) {
       await this.initGpu();
       if (!this.gpu) return this.skip(spec, this.gpuError);
+      if (!this.gpuWarm && this.mode !== 'verify') {
+        console.log(`  ${'gpu'.padEnd(11)} ${'warm-up'.padEnd(26)} 2 s of fma_peak, not timed`);
+        await this.gpu.warmup(2);
+      }
+      this.gpuWarm = true;
       const setup = await this.gpu[GPU_SETUPS[test]](size);
       try {
         return await this.measure(spec, setup, 0, size);
@@ -739,7 +819,7 @@ class Runner {
       cpu: cpuinfoField('model name')[0] || os.cpus()[0]?.model || '',
       physical_cores: physicalCores(), logical_cpus: logicalCpus(),
       ram_gib: memKib ? (memKib / 2 ** 20).toFixed(1) : '',
-      power: powerSource(), platform_profile: readText('/sys/firmware/acpi/platform_profile') || '',
+      power: powerSource(), platform_profile: platformProfile(),
       cpu_temp_start_c: this.tempStart ?? '', cpu_temp_end_c: cpuTempC() ?? '',
       started: isoLocal(this.started), elapsed_s: elapsed.toFixed(3), host: this.machine, machine: this.machine,
       skipped: this.skipped.join('; '), failed: this.failed.join('; '),
@@ -763,7 +843,7 @@ class Runner {
       ['CPU', `${cpuinfoField('model name')[0] || '?'}, ${physicalCores()} physical / ${logicalCpus()} logical`],
       ['BLAS', this.blas ? `${this.blas.config}, ${this.blas.threads} threads` : `none (${this.blasError || 'not needed'})`],
       ['GPU', gpuText],
-      ['Power', `${powerSource()}, profile ${readText('/sys/firmware/acpi/platform_profile')}`],
+      ['Power', `${powerSource()}, profile ${platformProfile()}`],
       ['CPU temp', this.tempStart !== null ? `${this.tempStart.toFixed(0)} C` : '?'],
       ['Mode', this.mode],
       ['Output', tilde(this.csvPath)],
