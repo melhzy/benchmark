@@ -1,0 +1,19 @@
+# Environments and dependencies (recreated by the setup steps in README.md)
+.venv/
+JavaScript/node_modules/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# C++ build output
+Cpp/common_benchmark
+Cpp/.build-*
+
+# Editor / OS clutter
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Logs
+*.log

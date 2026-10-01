@@ -1,0 +1,28 @@
+key,value
+run_id,cpp_20261001-133954
+batch,20261001-133954
+language,C++
+mode,full
+language_version,g++ 15.2.0
+build,g++ -O3 -march=native -ffp-contract=off -std=c++20 -pthread
+blas,OpenBLAS 0.3.32 NO_LAPACKE DYNAMIC_ARCH NO_AFFINITY Zen MAX_THREADS=128
+numpy_version,
+cpu,AMD Ryzen 5 5625U with Radeon Graphics
+physical_cores,6
+logical_cpus,12
+ram_gib,61.15
+power,AC
+platform_profile,balanced
+cpu_temp_start_c,58
+cpu_temp_end_c,72.5
+started,2026-10-01T13:39:54
+elapsed_s,74.4744
+host,dell-inc-inspiron-14-7425-2-in-1
+machine,dell-inc-inspiron-14-7425-2-in-1
+gpu_platform,rusticl
+gpu_device,"AMD Radeon Graphics (radeonsi, renoir, ACO, DRM 3.64, 7.0.0-34-generic)"
+gpu_compute_units,7
+gpu_max_clock_mhz,1800
+gpu_driver,26.0.8-1ubuntu0.3
+skipped,
+failed,

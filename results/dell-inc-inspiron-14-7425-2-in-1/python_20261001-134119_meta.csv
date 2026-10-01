@@ -1,0 +1,28 @@
+key,value
+run_id,python_20261001-134119
+batch,20261001-133954
+language,Python
+mode,full
+language_version,CPython 3.14.7
+build,~/miniconda3/bin/python
+blas,scipy-openblas: OpenBLAS 0.3.34.106.0  USE64BITINT DYNAMIC_ARCH NO_AFFINITY Haswell MAX_THREADS=64
+numpy_version,2.5.3
+cpu,AMD Ryzen 5 5625U with Radeon Graphics
+physical_cores,6
+logical_cpus,12
+ram_gib,61.2
+power,AC
+platform_profile,balanced
+cpu_temp_start_c,58.375
+cpu_temp_end_c,73.25
+started,2026-10-01T13:41:19
+elapsed_s,52.473
+host,dell-inc-inspiron-14-7425-2-in-1
+machine,dell-inc-inspiron-14-7425-2-in-1
+gpu_platform,rusticl (OpenCL 3.0 )
+gpu_device,"AMD Radeon Graphics (radeonsi, renoir, ACO, DRM 3.64, 7.0.0-34-generic)"
+gpu_compute_units,7
+gpu_max_clock_mhz,1800
+gpu_driver,26.0.8-1ubuntu0.3
+skipped,
+failed,

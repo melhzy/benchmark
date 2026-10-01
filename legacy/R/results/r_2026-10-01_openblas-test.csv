@@ -1,0 +1,26 @@
+"label","section","test","seconds"
+"openblas","r25-I","2500x2500 matrix creation, transpose, deform",0.323
+"openblas","r25-I","2500x2500 normal random matrix ^1000",0.214
+"openblas","r25-I","Sort 7,000,000 random values",0.646000000000001
+"openblas","r25-I","2800x2800 cross-product (a'a)",0.12
+"openblas","r25-I","Linear regression, 2000x2000 (normal equations)",0.124
+"openblas","r25-II","FFT over 2,400,000 random values",0.144
+"openblas","r25-II","Eigenvalues of a 600x600 random matrix",0.253
+"openblas","r25-II","Determinant of a 2500x2500 random matrix",0.0879999999999992
+"openblas","r25-II","Cholesky decomposition of a 3000x3000 matrix",0.100999999999999
+"openblas","r25-II","Inverse of a 1600x1600 random matrix",0.0800000000000001
+"openblas","r25-III","3,500,000 Fibonacci numbers (vector calc)",0.112
+"openblas","r25-III","3000x3000 Hilbert matrix (matrix calc)",0.132
+"openblas","r25-III","GCD of 400,000 pairs (recursion)",0.714
+"openblas","r25-III","500x500 Toeplitz matrix (loops)",0.171999999999997
+"openblas","r25-III","Escoufier's method on a 45x45 matrix (mixed)",0.178000000000001
+"openblas","practical","Interpreted for-loop, 50M iterations (in function)",16.924
+"openblas","practical","Memory: fill+sum+copy 8 GB of doubles (1e9)",10.949
+"openblas","practical","data.frame 10M rows: tapply group means (1000 grp)",0.448999999999998
+"openblas","practical","data.frame 10M rows: order by 2 keys",1.20400000000001
+"openblas","practical","merge() 1M x 1M rows on integer key",0.536000000000001
+"openblas","practical","lm() 1M rows x 20 predictors",1.491
+"openblas","practical","glm() logistic 500k rows x 10 predictors",0.816000000000003
+"openblas","practical","Strings: paste + regex gsub on 2M strings",4.61499999999999
+"openblas","practical","Bootstrap: 2000 resamples of median (n=10k), sapply",0.909000000000006
+"openblas","practical","Distance matrix dist() 5000x50",0.728999999999999

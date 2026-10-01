@@ -1,0 +1,7 @@
+# Python packages for the benchmark (Python/common_benchmark.py) and the notebook (analysis.ipynb).
+# Install into the Python you run the benchmark with, e.g.:  python3 -m pip install -r requirements.txt
+numpy>=2.0
+pyopencl>=2024.1      # GPU tests; needs an OpenCL driver (see README)
+pandas>=2.0           # notebook
+matplotlib>=3.8       # notebook
+jupyterlab>=4.0       # notebook

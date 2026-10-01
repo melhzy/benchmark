@@ -1,0 +1,28 @@
+key,value
+run_id,r_20261001-132333
+batch,20261001-132106
+language,R
+mode,full
+language_version,R 4.5.2
+build,/usr/lib/R
+blas,/usr/lib/x86_64-linux-gnu/openblas-pthread/libblas.so.3
+numpy_version,
+cpu,AMD Ryzen 5 5625U with Radeon Graphics
+physical_cores,6
+logical_cpus,12
+ram_gib,61.2
+power,AC
+platform_profile,balanced
+cpu_temp_start_c,61.375
+cpu_temp_end_c,68.5
+started,2026-10-01T13:23:33
+elapsed_s,182.0
+host,dell-inc-inspiron-14-7425-2-in-1
+machine,dell-inc-inspiron-14-7425-2-in-1
+gpu_platform,rusticl OpenCL 3.0 
+gpu_device,"AMD Radeon Graphics (radeonsi, renoir, ACO, DRM 3.64, 7.0.0-34-generic)"
+gpu_compute_units,7
+gpu_max_clock_mhz,1800
+gpu_driver,26.0.8-1ubuntu0.3
+skipped,
+failed,

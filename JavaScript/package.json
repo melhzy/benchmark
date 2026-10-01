@@ -1,0 +1,15 @@
+{
+  "name": "benchmark-javascript",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Common C++/Python/R/JavaScript benchmark - JavaScript (Node.js) implementation (common/SPEC.md)",
+  "type": "module",
+  "main": "common_benchmark.mjs",
+  "scripts": {
+    "bench": "node --expose-gc common_benchmark.mjs"
+  },
+  "dependencies": {
+    "koffi": "^3.3.2",
+    "webgpu": "^0.6.1"
+  }
+}
