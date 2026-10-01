@@ -88,8 +88,10 @@ change `common/tests.csv` (the notebook warns when machines ran different test v
 
 ## Adding a machine
 
-1. Clone the repository on the new machine, set it up as above, and run `./run_all.sh`.
+1. Clone the repository on the new machine, set it up as above, and run `./run_all.sh` (and
+   `./run_all.sh --verify`, so the results page can show that all languages agree).
 2. Commit the new `results/<machine>/` folder and push it (or open a pull request).
+3. Optionally rebuild the results page for it (below).
 
 ## Analysing
 
@@ -102,6 +104,21 @@ newest run): scores relative to C++, every test, parallel scaling, BLAS, memory 
 the theoretical peak, run-to-run variation, temperature and clock speed during the run, and generated key
 findings. Section 12 compares all machines. Theoretical peaks are estimated from each machine's
 `system_<batch>.csv`; if a guess is wrong, correct it with `PEAK_OVERRIDES` in the first cell.
+
+## Results page
+
+`docs/index.html` is the page GitHub Pages serves at <https://melhzy.github.io/benchmark/>. It shows one
+machine and is rebuilt from `results/` with:
+
+```bash
+python3 docs/build_page.py                     # the machine with the newest full run
+python3 docs/build_page.py --machine NAME      # a specific machine (folder name in results/)
+python3 docs/build_page.py --list              # machines that have full runs
+```
+
+Then commit `docs/index.html`. All text, chart ranges, theoretical peaks and findings are computed from that
+machine's results; the "identical answers" badge appears when its folder contains a passing
+`./run_all.sh --verify` run. Layout and wording live in `docs/page_template.html`.
 
 ## Repository layout
 
@@ -119,6 +136,7 @@ Python/                        Python version (common_benchmark.py)
 R/                             R version (common_benchmark.R)
 JavaScript/                    JavaScript version (common_benchmark.mjs, package.json)
 results/<machine>/             <lang>_<time>.csv + _meta.csv, system_<batch>.csv, sensors_<batch>.csv
+docs/                          results page: index.html (GitHub Pages), build_page.py, page_template.html
 legacy/                        the earlier single-language R and Python benchmarks
 ```
 

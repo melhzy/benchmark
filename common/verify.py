@@ -98,29 +98,25 @@ def agree(values, tol):
     return all(math.isclose(v, ref, rel_tol=tol, abs_tol=tol * scale) for v in nums)
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__.strip().splitlines()[0])
-    parser.add_argument("--dir", default=os.path.join(ROOT, "results", machine_id()))
-    parser.add_argument("--batch", help="only runs with this BENCH_BATCH id")
-    args = parser.parse_args()
+def compare(directory, batch=None):
+    """Compare the newest verify-mode checks of every language in `directory`.
 
-    runs = load(args.dir, args.batch)
+    Returns None if there are no verify runs, else a dict with the languages, the number of runs,
+    one row per (test, size) with each language's check value and a status, and the count of
+    rows that need attention. Used by main() and by docs/build_page.py.
+    """
+    runs = load(directory, batch)
     if not runs:
-        print(f"No --verify runs found in {args.dir}" + (f" for batch {args.batch}" if args.batch else ""))
-        return 1
+        return None
     langs = [l for l in LANGS if l in runs]
-    print(f"\nCross-language check ({len({r['run_id'] for l in langs for r in runs[l]})} verify runs: {', '.join(langs)})")
-
     # (test, size) -> {lang: [checks]} ; several rows per test (repeats, worker counts, threads)
     table = {}
     for lang in langs:
         for row in runs[lang]:
             table.setdefault((row["category"], row["test"], row["size"]), {}).setdefault(lang, []).append(row["check"])
-
-    skipped = intended_skips(args.dir, {r["run_id"] for l in langs for r in runs[l]})
+    skipped = intended_skips(directory, {r["run_id"] for l in langs for r in runs[l]})
     serial = {size: c for (cat, test, size), c in table.items() if test == "mandelbrot"}
-    bad = 0
-    print(f"  {'test':<20}{'size':>8}  " + "".join(f"{l:>20}" for l in langs) + "  result")
+    rows, bad = [], 0
     for (cat, test, size), by_lang in sorted(table.items()):
         tol = 0 if test in EXACT else TOLERANCE.get(test, DEFAULT_TOLERANCE)
         values = [v for l in langs for v in by_lang.get(l, [])]
@@ -136,9 +132,29 @@ def main():
         else:
             status = "OK" + (f" (skipped by {', '.join(missing)})" if missing else "")
         bad += not status.startswith("OK")
-        cells = "".join(f"{float(by_lang[l][0]):>20.14g}" if l in by_lang
-                        else f"{'skipped' if test in skipped.get(l, set()) else '-':>20}" for l in langs)
-        print(f"  {test:<20}{size:>8}  {cells}  {status}")
+        rows.append({"test": test, "size": size, "status": status,
+                     "values": {l: (float(by_lang[l][0]) if l in by_lang else
+                                    ("skipped" if test in skipped.get(l, set()) else None)) for l in langs}})
+    return {"langs": langs, "runs": len({r["run_id"] for l in langs for r in runs[l]}), "rows": rows, "bad": bad}
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__.strip().splitlines()[0])
+    parser.add_argument("--dir", default=os.path.join(ROOT, "results", machine_id()))
+    parser.add_argument("--batch", help="only runs with this BENCH_BATCH id")
+    args = parser.parse_args()
+
+    result = compare(args.dir, args.batch)
+    if result is None:
+        print(f"No --verify runs found in {args.dir}" + (f" for batch {args.batch}" if args.batch else ""))
+        return 1
+    langs = result["langs"]
+    print(f"\nCross-language check ({result['runs']} verify runs: {', '.join(langs)})")
+    print(f"  {'test':<20}{'size':>8}  " + "".join(f"{l:>20}" for l in langs) + "  result")
+    for row in result["rows"]:
+        cells = "".join(f"{v:>20.14g}" if isinstance(v, float) else f"{v or '-':>20}" for v in row["values"].values())
+        print(f"  {row['test']:<20}{row['size']:>8}  {cells}  {row['status']}")
+    bad = result["bad"]
     print(f"\n{'All results agree.' if not bad else f'{bad} test(s) need attention.'}")
     return 1 if bad else 0
 

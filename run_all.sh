@@ -127,6 +127,7 @@ write_system() {
     kv suite_commit "$(git -C "$ROOT" describe --always --dirty 2>/dev/null || echo none)"
     kv suite_tests_sha "$(cat "$ROOT"/common/tests.csv "$ROOT"/common/kernels.cl "$ROOT"/common/kernels.wgsl | sha256sum | cut -c1-12)"
     kv vendor "$(trim "$(read1 /sys/class/dmi/id/sys_vendor)")"; kv product "$(trim "$(read1 /sys/class/dmi/id/product_name)")"
+    kv chassis "$(case "$(read1 /sys/class/dmi/id/chassis_type)" in 8|9|10|14|30|31|32) echo laptop ;; 3|4|5|6|7|13|15|16|35|36) echo desktop ;; 17|23|28|29) echo server ;; *) echo "" ;; esac)"
     kv os "$(. /etc/os-release 2>/dev/null; echo "${PRETTY_NAME:-Linux}")"; kv kernel "$(uname -r)"; kv arch "$(uname -m)"
     kv cpu "$(sed -n 's/^model name[[:space:]]*: //p' /proc/cpuinfo | head -1)"
     kv cpu_max_mhz "$(awk '{printf "%.0f", $1/1000}' /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq 2>/dev/null)"

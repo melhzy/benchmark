@@ -1,18 +1,9 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="How C++, Python, R and JavaScript use a laptop&#x27;s CPU, memory and GPU (Dell Inspiron 14 7425 2-in-1), measured with one shared benchmark suite.">
-<meta property="og:title" content="Four languages, one laptop">
-<meta property="og:description" content="How C++, Python, R and JavaScript use a laptop&#x27;s CPU, memory and GPU (Dell Inspiron 14 7425 2-in-1), measured with one shared benchmark suite.">
-<meta property="og:type" content="website">
-<style>
-:root { color-scheme: light; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
-body { margin: 0; }
-img { max-width: 100%; }
-[hidden] { display: none !important; }
-</style>
+<!--
+  docs/page_template.html -- template for the results page (docs/index.html).
+  Built by docs/build_page.py: double-brace placeholders are filled with text computed from
+  results/<machine>/, __DATA__ becomes the page's JSON data, and optional:x ... /optional:x
+  comment pairs mark blocks that are dropped when that machine has no data for them.
+-->
 <title>Four-Language Benchmark</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -152,25 +143,24 @@ pre { background: var(--surface); border: 1px solid var(--hair); border-radius: 
 footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--muted); font-size: 0.85rem; display: flex; flex-wrap: wrap; gap: 6px 18px; }
 @media (prefers-reduced-motion: no-preference) { .hit { transition: fill 120ms ease; } }
 </style>
-</head>
-<body>
+
 <div class="page">
   <header>
     <div class="eyebrow">Benchmark results · <a href="https://github.com/melhzy/benchmark">github.com/melhzy/benchmark</a></div>
-    <h1>Four languages, one laptop</h1>
-    <p class="lede">The same 18 tests, written in C++, Python, R and JavaScript, run on one laptop to see how each language uses its CPU, memory and GPU.</p>
+    <h1>{{h1}}</h1>
+    <p class="lede">The same 18 tests, written in C++, Python, R and JavaScript, run on one {{kind}} to see how each language uses its CPU, memory and GPU.</p>
     <dl class="spec" id="spec"></dl>
     <div class="actions">
       <a class="button" href="https://github.com/melhzy/benchmark">
         <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
         Code and raw data on GitHub
       </a>
-      
+      <!-- optional:verify -->
       <span class="check">
         <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="8" fill="none" stroke="var(--good)" stroke-width="1.6"/><path d="M5.2 9.3l2.4 2.4 5-5.2" fill="none" stroke="var(--good)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        All four languages computed identical answers on all 18 tests
+        {{verify_badge}}
       </span>
-      
+      <!-- /optional:verify -->
     </div>
   </header>
 
@@ -190,7 +180,7 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
   <section aria-labelledby="h-tests">
     <div class="section-head">
       <h2 id="h-tests">Every test</h2>
-      <p>Speed relative to C++ on a log scale, so 0.01× and 10× fit on one axis. Hover a row for the measured rates and the spread across three full runs. Plain loops are where Python and R fall furthest behind; library calls are where they catch up.</p>
+      <p>Speed relative to C++ on a log scale, so 0.01× and 10× fit on one axis. Hover a row for the measured rates and the spread across {{runs_text}}. Plain loops are where Python and R fall furthest behind; library calls are where they catch up.</p>
     </div>
     <figure>
       <figcaption><span class="t">Speed relative to C++, per test</span><div class="legend" id="lg-tests"></div></figcaption>
@@ -202,7 +192,7 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
   <section aria-labelledby="h-cores">
     <div class="section-head">
       <h2 id="h-cores">Using all cores</h2>
-      <p>The same Mandelbrot work split across 1 to 12 workers. The CPU has 6 physical cores and 12 hardware threads. C++ and JavaScript run their workers as threads; Python and R start separate processes.</p>
+      <p>{{cores_text}}</p>
     </div>
     <figure>
       <figcaption><span class="t">Speedup over one worker</span><div class="legend" id="lg-par"></div></figcaption>
@@ -214,7 +204,7 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
   <section aria-labelledby="h-mem">
     <div class="section-head">
       <h2 id="h-mem">Memory</h2>
-      <p>Bandwidth against the memory's theoretical peak of 51.2 GB/s (DDR4-3200, two channels). Python and R work on one core; C++ also runs the triad on all cores.</p>
+      <p>{{mem_text}}</p>
     </div>
     <figure>
       <figcaption><span class="t">Memory bandwidth</span><div class="legend" id="lg-bw"></div></figcaption>
@@ -237,21 +227,21 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
     </div>
   </section>
 
-  
+  <!-- optional:gpu -->
   <section aria-labelledby="h-gpu">
     <div class="section-head">
-      <h2 id="h-gpu">GPU (AMD Radeon Graphics, 7 compute units)</h2>
-      <p>C++, Python and R run identical OpenCL kernels; JavaScript runs a line-by-line WebGPU translation. Once a kernel runs, the language barely matters. Moving data does: R has no 32-bit number type and converts every value, so its uploads are 10× slower than C++'s here.</p>
+      <h2 id="h-gpu">{{gpu_title}}</h2>
+      <p>{{gpu_text}}</p>
     </div>
     <div class="legend" id="lg-gpu"></div>
     <div class="grid-2" id="gpu-grid"></div>
   </section>
-  
+  <!-- /optional:gpu -->
 
   <section aria-labelledby="h-peak">
     <div class="section-head">
       <h2 id="h-peak">How much of the hardware each language reaches</h2>
-      <p>Best measured rate as a share of the theoretical peak. The CPU peak assumes all 6 cores at full boost (4.4 GHz), which few machines hold under sustained load; matrix multiply goes through OpenBLAS in every language.</p>
+      <p>{{peak_text}}</p>
     </div>
     <figure>
       <figcaption><span class="t">Share of theoretical peak</span><div class="legend" id="lg-util"></div></figcaption>
@@ -260,50 +250,46 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
     </figure>
   </section>
 
-  
+  <!-- optional:heat -->
   <section aria-labelledby="h-heat">
     <div class="section-head">
       <h2 id="h-heat">Heat and clock speed during a run</h2>
-      <p>One full run, sampled every second. The CPU peaked at 100 °C, and while the benchmark ran its average clock was 2.6 GHz against a 4.4 GHz maximum.</p>
+      <p>{{heat_text}}</p>
     </div>
     <figure>
       <figcaption><span class="t">CPU temperature and average clock, by language</span><span class="note" id="heat-batch"></span></figcaption>
       <div class="chart" id="ch-heat"></div>
     </figure>
   </section>
-  
+  <!-- /optional:heat -->
 
   <section aria-labelledby="h-find">
     <div class="section-head"><h2 id="h-find">What the numbers say</h2></div>
     <ul class="findings">
-      <li style="--k: var(--c-js)"><span><b>JavaScript: 0.75× of C++ speed overall.</b> Beats C++ on <span class="mono">mem_alloc</span> (1.1×) and falls furthest behind on <span class="mono">fib_recursive</span> (0.13×, 8× slower). Plain loops run at 0.51× of C++ and library or vectorized code at 0.78×.</span></li>
-      <li style="--k: var(--c-py)"><span><b>Python: 0.42× of C++ speed overall.</b> Beats C++ on <span class="mono">sort</span> (7.4×) and falls furthest behind on <span class="mono">fib_recursive</span> (0.013×, 75× slower). Plain loops run at 0.026× of C++ and library or vectorized code at 1.1×.</span></li>
-      <li style="--k: var(--c-r)"><span><b>R: 0.17× of C++ speed overall.</b> Beats C++ on <span class="mono">sort</span> (1.3×) and falls furthest behind on <span class="mono">fib_recursive</span> (0.0017×, 573× slower). Plain loops run at 0.013× of C++ and library or vectorized code at 0.3×.</span></li>
-      <li><span><b>All cores:</b> the best parallel speedups are C++ 9.3×, JavaScript 8×, Python 5.4×, R 4×, on 6 physical cores.</span></li>
-      <li><span><b>The hardware sets the ceiling:</b> matrix multiply reaches 231 GFLOP/s at best (55% of the CPU's theoretical peak); GPU compute reaches 798 GFLOP/s (50% of its peak), about the same from every language.</span></li>
+{{findings}}
     </ul>
   </section>
 
   <section aria-labelledby="h-method">
     <div class="section-head"><h2 id="h-method">How it was measured</h2></div>
     <div class="method">
-      <p>Each language implements the same specification: the same algorithms, the same inputs (generated from one formula, not each language's random generator) and the same output format. Loop-heavy tests use smaller sizes in Python and R, and every result is a rate (work per second), so sizes don't affect the comparison. Each test runs five times after a warm-up; the median counts. The figures above come from the newest full run of each language; the run-to-run spread is in the tooltips (typically 1.2% between runs).</p>
-      <p>Before each language, the runner waits for the CPU to cool below 60 °C. The laptop was on AC power with the balanced power profile. A verify mode runs tiny identical inputs and checks that all languages produce the same answers; on this laptop they agree on all 18 tests, to the last digit for integer results.</p>
+      <p>Each language implements the same specification: the same algorithms, the same inputs (generated from one formula, not each language's random generator) and the same output format. Loop-heavy tests use smaller sizes in Python and R, and every result is a rate (work per second), so sizes don't affect the comparison. Each test runs five times after a warm-up; the median counts. The figures above come from the newest full run of each language; the run-to-run spread is in the tooltips ({{spread_text}}).</p>
+      <p>Before each language, the runner waits for the CPU to cool below 60 °C. {{power_text}} {{verify_text}}</p>
       <p>To add a machine, clone the repository and run:</p>
       <pre>./run_all.sh --check     # what is installed, per language
-./run_all.sh             # about 7 minutes on this laptop; results go to results/&lt;machine&gt;/</pre>
+./run_all.sh             # {{minutes_text}}; results go to results/&lt;machine&gt;/</pre>
       <p>Full definitions are in <a href="https://github.com/melhzy/benchmark/blob/main/common/SPEC.md">common/SPEC.md</a>, and the analysis notebook with more charts is <a href="https://github.com/melhzy/benchmark/blob/main/analysis.ipynb">analysis.ipynb</a>.</p>
     </div>
   </section>
 
   <footer>
-    <span>Results from 1 October 2026 · Dell Inspiron 14 7425 2-in-1</span>
+    <span>Results from {{date_text}} · {{machine_name}}</span>
     <span>MIT License · <a href="https://github.com/melhzy/benchmark">melhzy/benchmark</a></span>
   </footer>
 </div>
 <div id="tip" hidden></div>
 
-<script id="data" type="application/json">{"langs":["C++","Python","R","JavaScript"],"categories":{"cpu_single":{"C++":1.0,"Python":0.2297335477664079,"R":0.062127980412977526,"JavaScript":0.5910708667868343},"cpu_multi":{"C++":1.0,"Python":0.11554179642120876,"R":0.09204503418082449,"JavaScript":0.9270501414182596},"ram":{"C++":1.0,"Python":1.1694030921872451,"R":0.33823919284493,"JavaScript":0.8694159225985031},"gpu":{"C++":1.0,"Python":0.9684966512075297,"R":0.38454375805871266,"JavaScript":0.6681851078306135}},"overall":{"C++":1.0,"Python":0.4163959282337517,"R":0.1651445795986598,"JavaScript":0.7511329092353383},"tests":[{"test":"scalar_loop","category":"cpu_single","style":"loop","unit":"M iter/s","rate":{"C++":506.0755,"Python":26.1249,"R":35.6396,"JavaScript":505.184},"range":{"C++":[504.2828,506.6555,3],"Python":[25.6111,26.6382,3],"R":[35.6396,37.682,3],"JavaScript":[505.184,506.5417,3]}},{"test":"mandelbrot","category":"cpu_single","style":"loop","unit":"M px/s","rate":{"C++":15.2533,"Python":0.3879,"R":0.2945,"JavaScript":15.2175},"range":{"C++":[15.1748,15.2545,3],"Python":[0.3619,0.3919,3],"R":[0.278,0.3033,3],"JavaScript":[15.2134,15.2263,3]}},{"test":"fib_recursive","category":"cpu_single","style":"loop","unit":"M calls/s","rate":{"C++":2601.897,"Python":34.8901,"R":4.5441,"JavaScript":338.525},"range":{"C++":[2578.3135,2601.897,3],"Python":[34.8534,36.8875,3],"R":[4.5441,4.6459,3],"JavaScript":[338.525,352.3819,3]}},{"test":"vector_math","category":"cpu_single","style":"vectorized","unit":"M elem/s","rate":{"C++":480.0936,"Python":318.9856,"R":118.4,"JavaScript":206.1679},"range":{"C++":[475.0046,480.0936,3],"Python":[317.9354,319.245,3],"R":[118.4,119.8897,3],"JavaScript":[206.1242,206.1955,3]}},{"test":"sort","category":"cpu_single","style":"builtin","unit":"M items/s","rate":{"C++":11.8702,"Python":87.4321,"R":16.005,"JavaScript":9.8783},"range":{"C++":[11.8702,12.0102,3],"Python":[87.4321,88.1113,3],"R":[15.6622,16.005,3],"JavaScript":[9.85,9.8938,3]}},{"test":"hashmap","category":"cpu_single","style":"builtin","unit":"M ops/s","rate":{"C++":6.8795,"Python":7.1816,"R":0.3002,"JavaScript":6.586},"range":{"C++":[6.8795,7.2448,3],"Python":[7.1816,7.4625,3],"R":[0.2963,0.3002,3],"JavaScript":[6.5323,6.7157,3]}},{"test":"string_ops","category":"cpu_single","style":"builtin","unit":"M items/s","rate":{"C++":10.651,"Python":3.9994,"R":1.1044,"JavaScript":6.0558},"range":{"C++":[10.651,11.0235,3],"Python":[3.9994,4.0725,3],"R":[1.1044,1.3205,3],"JavaScript":[6.0558,6.1509,3]}},{"test":"parallel_mandelbrot","category":"cpu_multi","style":"parallel","unit":"M px/s","rate":{"C++":140.9395,"Python":2.0589,"R":1.1672,"JavaScript":121.4452},"range":{"C++":[139.4374,142.3488,3],"Python":[2.0022,2.114,3],"R":[1.1672,1.2152,3],"JavaScript":[121.4452,131.8817,3]}},{"test":"matmul_blas","category":"cpu_multi","style":"blas","unit":"GFLOP/s","rate":{"C++":225.4113,"Python":205.9916,"R":230.612,"JavaScript":224.8198},"range":{"C++":[221.7144,227.0269,3],"Python":[205.9916,214.907,3],"R":[217.9039,230.612,3],"JavaScript":[222.3132,224.8198,2]}},{"test":"mem_copy","category":"ram","style":"builtin","unit":"GB/s","rate":{"C++":24.5059,"Python":25.6542,"R":4.8779,"JavaScript":24.6389},"range":{"C++":[24.5059,24.7928,3],"Python":[25.4185,25.6542,3],"R":[4.8779,5.1046,3],"JavaScript":[24.6334,25.0918,3]}},{"test":"mem_triad","category":"ram","style":"vectorized","unit":"GB/s","rate":{"C++":23.8079,"Python":13.8334,"R":5.1599,"JavaScript":16.345},"range":{"C++":[23.8079,24.1824,3],"Python":[13.8334,13.9348,3],"R":[5.1599,5.2784,3],"JavaScript":[16.345,16.8728,3]}},{"test":"mem_gather","category":"ram","style":"vectorized","unit":"M accesses/s","rate":{"C++":152.56,"Python":113.9687,"R":76.8335,"JavaScript":112.2537},"range":{"C++":[152.56,155.7008,3],"Python":[113.9687,116.008,3],"R":[76.5272,76.8335,3],"JavaScript":[112.056,114.4517,3]}},{"test":"mem_alloc","category":"ram","style":"builtin","unit":"GB/s","rate":{"C++":3.7144,"Python":15.2864,"R":2.2376,"JavaScript":4.1785},"range":{"C++":[3.7144,3.795,3],"Python":[15.2864,15.5037,3],"R":[2.2376,2.28,3],"JavaScript":[4.1602,4.2287,3]}},{"test":"gpu_fp32_peak","category":"gpu","style":"gpu","unit":"GFLOP/s","rate":{"C++":785.7561,"Python":774.5134,"R":763.3513,"JavaScript":798.3521},"range":{"C++":[785.7561,797.96,3],"Python":[774.5134,794.1212,3],"R":[763.3513,787.5222,3],"JavaScript":[798.1226,799.0983,3]}},{"test":"gpu_bandwidth","category":"gpu","style":"gpu","unit":"GB/s","rate":{"C++":41.1801,"Python":39.6569,"R":38.2299,"JavaScript":40.3156},"range":{"C++":[40.26,41.1801,3],"Python":[39.6569,39.9992,3],"R":[38.2299,39.2419,3],"JavaScript":[39.3153,40.9818,3]}},{"test":"gpu_sgemm","category":"gpu","style":"gpu","unit":"GFLOP/s","rate":{"C++":122.0764,"Python":127.5676,"R":118.228,"JavaScript":96.8367},"range":{"C++":[120.62,163.5511,3],"Python":[117.5317,127.5676,3],"R":[118.228,167.9723,3],"JavaScript":[96.42,98.779,3]}},{"test":"gpu_upload","category":"gpu","style":"gpu","unit":"GB/s","rate":{"C++":14.1974,"Python":15.0563,"R":1.4888,"JavaScript":2.3234},"range":{"C++":[14.1974,15.1455,3],"Python":[15.0563,15.2529,3],"R":[1.4887,1.4937,3],"JavaScript":[2.3234,2.4146,3]}},{"test":"gpu_download","category":"gpu","style":"gpu","unit":"GB/s","rate":{"C++":4.147,"Python":3.3592,"R":0.3807,"JavaScript":4.2776},"range":{"C++":[3.4309,4.5777,3],"Python":[3.3592,3.3666,3],"R":[0.3719,0.3807,3],"JavaScript":[4.0071,4.3705,3]}}],"workers":[1,2,4,6,8,12],"parallel":{"C++":[1.0,2.02,3.95,5.71,7.0,9.26],"Python":[1.0,1.93,3.65,4.87,5.06,5.36],"R":[1.0,1.83,3.21,3.74,3.81,4.0],"JavaScript":[1.0,1.99,3.91,5.56,6.72,8.01]},"triad":{"1":{"C++":21.93,"JavaScript":16.34,"Python":13.83,"R":5.16},"6":{"C++":23.81},"12":{"C++":23.47}},"alloc_sizes":[1.0,2.0,4.0,8.0,16.0],"alloc":{"C++":[3.52,3.57,3.63,3.69,3.71],"Python":[14.92,15.09,15.04,15.23,15.29],"R":[2.24,1.79,1.82,2.04,1.63],"JavaScript":[3.0,4.09,4.13,4.17,4.18]},"alloc_seconds":{"C++":[0.61,1.2,2.37,4.66,9.25],"Python":[0.14,0.28,0.57,1.13,2.25],"R":[0.96,2.4,4.72,8.44,21.06],"JavaScript":[0.72,1.05,2.08,4.12,8.22]},"peaks":{"cpu_fp64":421.4,"ram":51.2,"gpu_fp32":1612.8},"util":[{"name":"CPU compute (FP64 matrix multiply)","peak":421.4,"unit":"GFLOP/s","pct":{"C++":53.5,"Python":48.9,"R":54.7,"JavaScript":53.4}},{"name":"RAM bandwidth (copy or triad, one core)","peak":51.2,"unit":"GB/s","pct":{"C++":47.9,"Python":50.1,"R":10.1,"JavaScript":48.1}},{"name":"GPU compute (FP32 peak kernel)","peak":1612.8,"unit":"GFLOP/s","pct":{"C++":48.7,"Python":48.0,"R":47.3,"JavaScript":49.5}},{"name":"GPU memory bandwidth","peak":51.2,"unit":"GB/s","pct":{"C++":80.4,"Python":77.5,"R":74.7,"JavaScript":78.7}}],"sensors":{"batch":"20261001-135441","t":[0.0,1.0,2.0,3.1,4.1,5.1,6.1,7.2,8.2,9.2,10.2,11.2,12.3,13.3,14.3,15.3,16.3,17.4,18.4,19.4,20.4,21.5,22.5,23.5,24.5,25.5,26.6,27.6,28.6,29.6,30.6,31.7,32.7,33.7,34.7,35.7,36.8,37.8,38.8,39.8,41.0,42.1,43.1,44.2,45.2,46.3,47.3,48.6,49.6,50.7,51.7,52.7,53.7,54.7,55.8,56.8,57.8,58.8,59.8,60.9,61.9,62.9,63.9,65.0,66.0,67.0,68.0,69.0,70.1,71.1,72.1,73.1,74.2,75.2,76.2,77.2,78.2,79.3,80.3,81.3,82.3,83.3,84.4,85.4,86.4,87.4,88.4,89.5,90.5,91.5,92.5,93.6,94.6,95.6,96.6,97.6,98.7,99.7,100.7,101.7,102.7,103.8,104.8,105.8,106.8,107.9,108.9,109.9,110.9,112.0,113.0,114.0,115.0,116.0,117.1,118.1,119.1,120.1,121.1,122.2,123.3,124.3,125.4,126.6,127.7,128.7,129.7,130.8,131.8,132.8,133.8,134.9,135.9,136.9,138.0,139.0,140.0,141.0,142.1,143.1,144.1,145.2,146.2,147.2,148.2,149.3,150.3,151.3,152.3,153.4,154.4,155.4,156.5,157.5,158.5,159.5,160.6,161.6,162.6,163.6,164.7,165.7,166.7,167.7,168.7,169.8,170.8,171.8,172.8,173.9,174.9,175.9,176.9,178.0,179.0,180.0,181.0,182.0,183.1,184.1,185.1,186.1,187.1,188.2,189.2,190.2,191.2,192.2,193.3,194.3,195.3,196.3,197.4,198.4,199.4,200.4,201.4,202.5,203.5,204.5,205.5,206.5,207.6,208.6,209.6,210.6,211.7,212.7,213.7,214.7,215.7,216.8,217.8,218.8,219.8,220.9,221.9,222.9,223.9,224.9,226.0,227.0,228.0,229.0,230.1,231.1,232.1,233.1,234.2,235.3,236.4,237.5,238.5,239.5,240.5,241.6,242.6,243.6,244.6,245.7,246.7,247.7,248.7,249.7,250.8,251.8,252.8,253.8,254.9,255.9,256.9,257.9,259.0,260.0,261.0,262.0,263.1,264.1,265.1,266.1,267.2,268.2,269.2,270.2,271.2,272.3,273.3,274.3,275.3,276.4,277.4,278.4,279.4,280.4,281.5,282.5,283.5,284.5,285.5,286.6,287.6,288.6,289.6,290.6,291.7,292.7,293.7,294.7,295.8,296.8,297.8,298.8,299.9,300.9,301.9,302.9,303.9,305.0,306.0,307.0,308.0,309.0,310.1,311.1,312.1,313.1,314.1,315.2,316.2,317.2,318.2,319.2,320.3,321.3,322.3,323.3,324.4,325.4,326.4,327.4,328.5,329.5,330.5,331.5,332.5,333.6,334.6,335.6,336.6,337.6,338.7,339.7,340.7,341.7,342.8,343.8,344.8,345.8,346.9,347.9,348.9,349.9,351.0,352.0,353.0,354.0,355.1,356.1,357.1,358.1,359.1,360.2,361.2,362.2,363.2,364.3,365.3,366.3,367.3,368.3,369.4,370.4,371.4,372.4,373.5,374.5,375.5,376.5,377.5,378.6,379.6,380.6,381.6,382.6,383.7,384.7,385.7,386.7,387.7,388.8,389.8,390.8,391.8,392.9,393.9,394.9,395.9,397.0,398.1,399.2,400.3,401.4,402.4,403.4,404.5,405.5,406.5,407.5,408.6,409.6,410.6,411.6,412.7,413.7,414.7,415.7,416.7,417.8,418.8,419.8,420.8,421.8,422.9,423.9,424.9,425.9,427.0,428.0,429.0,430.0,431.0,432.1,433.1,434.1,435.1,436.2,437.2],"phase":["cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","idle","idle"],"cpu_temp":[45.2,52.9,53.9,55.0,55.4,55.9,56.8,58.6,59.6,60.5,70.1,78.0,78.6,77.6,77.2,76.9,76.8,76.4,76.8,76.9,76.6,77.5,77.4,77.2,76.0,74.9,73.9,73.1,72.4,71.5,71.1,73.0,76.9,78.8,79.4,78.4,77.6,77.5,82.6,86.5,89.1,90.6,92.0,92.9,91.9,91.2,90.0,90.2,90.5,89.8,88.6,87.5,86.9,86.2,85.8,85.0,84.8,84.2,83.8,83.0,83.0,82.5,82.0,81.5,81.1,80.8,80.2,79.5,78.6,80.6,79.2,78.2,79.2,78.6,77.2,75.0,72.8,70.8,68.8,67.0,65.4,63.8,62.5,61.4,60.1,59.2,58.1,57.1,56.2,76.1,90.5,95.8,98.2,99.1,99.4,99.4,99.5,99.8,99.9,100.0,99.9,96.8,95.0,93.8,91.6,89.8,88.2,86.8,85.2,84.0,83.1,82.0,86.8,89.2,91.0,96.0,98.5,99.4,99.1,98.5,97.2,96.2,95.1,94.4,93.4,92.1,91.0,89.9,89.0,87.4,85.8,84.2,83.9,84.4,85.8,84.9,88.1,86.0,83.9,81.9,79.8,77.2,74.8,72.5,70.2,68.2,66.4,64.6,63.0,61.5,60.1,58.9,57.8,56.6,55.8,68.5,87.9,95.4,98.1,99.2,99.6,100.0,100.0,100.2,100.2,100.2,100.4,98.4,96.4,94.5,94.8,93.8,94.6,95.2,95.0,94.8,94.1,94.8,92.6,89.8,87.0,84.2,82.4,80.1,78.2,76.6,75.6,74.5,73.5,72.9,72.2,71.5,70.9,70.8,70.2,69.8,69.6,69.8,69.1,68.8,68.8,70.6,71.9,73.1,74.1,74.0,79.4,84.0,84.5,87.0,85.2,87.5,85.9,88.0,87.2,88.0,86.6,87.1,95.4,98.2,98.1,97.5,95.9,94.4,93.5,92.4,89.5,86.8,84.9,84.5,84.5,85.2,85.6,85.8,84.4,82.9,81.5,82.4,83.1,81.6,82.1,82.4,82.8,82.8,82.2,80.9,79.4,78.1,76.9,75.8,74.8,73.9,73.0,73.0,72.6,73.0,72.2,74.8,73.5,72.9,71.9,71.1,70.4,69.6,69.4,69.4,71.2,70.6,70.2,74.1,72.9,72.2,71.5,72.5,79.5,78.1,76.4,75.5,74.8,74.1,73.1,72.8,87.6,85.4,83.0,82.4,81.5,81.4,80.8,79.8,78.9,78.0,77.2,76.0,75.5,75.0,74.6,74.1,73.9,73.5,89.0,96.0,98.5,97.5,94.4,91.5,88.8,87.5,86.4,84.0,81.6,79.6,78.9,76.9,75.5,73.9,72.6,72.2,72.6,72.2,71.8,71.5,71.9,72.1,71.9,71.2,70.6,71.5,72.5,73.5,72.9,72.2,71.1,71.5,69.4,67.2,65.4,63.6,62.0,60.5,59.1,57.9,57.0,59.8,61.1,61.5,61.9,62.1,62.2,65.6,67.2,67.8,68.1,88.4,95.8,98.4,99.4,99.9,99.5,96.0,94.1,93.6,93.1,92.8,92.4,92.1,91.8,91.5,91.2,91.2,91.0,91.1,89.9,87.9,86.1,84.6,83.0,81.9,80.6,79.8,78.6,78.0,78.0,86.5,91.2,90.0,88.6,88.1,87.8,87.2,87.0,87.4,86.4,86.6,92.6,93.6,92.2,90.4,88.6,86.9,86.2,86.2,85.8,86.4,85.9,85.5,85.1,86.4,88.5,87.9,87.2,86.8,86.2,85.8,85.2,88.5,92.6,92.4,91.4,89.6,88.6,87.5,85.8,84.4,82.8,80.4,77.6],"cpu_mhz":[3063,2122,2320,2759,2312,2553,2534,2557,2380,2734,2651,2507,2527,2661,3069,2433,2476,2581,2428,2502,3043,3394,2691,3045,2636,3210,2638,2497,3077,2654,2381,3018,2721,2517,3440,2366,2527,2935,3685,2983,2924,3014,3387,2808,2674,2733,3862,4167,3049,2690,2556,3029,2982,3456,3160,2614,2644,3023,2705,2548,3262,2750,3352,3194,2791,3131,2961,3014,2366,2432,2609,2263,3559,3088,2867,2854,2870,2382,2433,2405,2701,2816,3138,2367,2231,2322,2432,2316,2807,3301,2945,3675,2455,2659,2498,2447,3505,3393,2899,2622,2718,2892,2214,3167,3005,3045,2956,3682,2048,2241,2782,2679,2184,2907,2639,2316,3128,3096,3565,3231,3465,3035,3042,2900,2292,2679,3070,2244,2078,2306,2762,2517,2787,2510,2433,2730,1993,2027,1843,1856,1768,2305,1593,1842,1496,1692,1674,1673,1563,1587,1645,1615,1647,1661,1873,2267,2272,2603,2184,2267,2238,2625,2613,2482,2180,2579,2595,2495,2385,2703,2326,2543,3187,2087,2486,2581,2407,2312,2829,2367,2341,2253,2551,2315,2312,2336,2256,2465,2295,2317,2525,2366,2566,2421,2366,2524,2547,2698,2508,2186,2343,2566,2101,2370,2560,2107,2840,2372,2517,2538,2520,2533,2504,2309,3047,2329,2433,2653,2555,2642,2724,2451,2230,2473,2628,2160,2705,2764,2979,2982,3298,3868,2526,2082,2311,2882,2210,2333,2040,2225,2537,2472,2747,2844,2596,2174,2302,2077,2280,2120,2641,2732,2614,2740,2592,2513,2413,2579,2827,2554,2505,3040,2710,2548,2776,2741,2654,2729,2449,2554,2491,2507,2489,2474,2342,2302,2209,2276,2498,2369,2349,2307,2362,2648,2783,3616,4183,2830,3194,2532,2854,2781,2244,2169,2028,2319,2694,2351,2746,2752,3270,2649,2577,2552,2783,2379,2003,2481,2739,2475,2577,3059,2385,2330,1830,3018,2316,2657,2975,2819,2309,2541,2681,2296,2350,2324,2364,2314,2156,2299,2641,2171,2813,2095,1612,1669,1725,1614,2169,1981,1730,1732,1803,3021,2698,2917,2124,2515,2805,2611,3064,2705,2694,2682,2569,2407,2130,2630,2394,2295,2233,2438,2575,2654,2362,2532,2400,2216,2812,2294,2738,2753,2722,2839,2515,2581,2209,2376,2852,3063,3160,2311,2869,3044,2887,2733,4238,3021,2983,2923,2869,2678,3018,2428,2305,2599,2343,3003,2352,2774,3159,2828,2943,2989,2429,2783,2691,2659,3238,2520,2172,2468,2289,2314,3175,3680,3069,3018,2784,3385,2336,2995,2504,2522,2767,1824,1953],"gpu_busy":[2,3,1,2,1,2,3,2,1,2,3,1,1,2,2,3,2,0,2,1,1,2,2,4,4,5,3,3,2,3,4,4,3,2,5,2,4,2,1,1,0,3,1,3,1,0,0,2,4,3,10,4,3,2,3,2,2,2,4,3,2,3,3,3,2,3,3,3,2,4,65,69,42,25,13,6,4,3,3,3,3,2,3,2,2,2,2,2,2,4,4,4,3,3,3,2,3,3,3,2,3,3,2,2,2,2,3,2,2,2,2,2,3,2,3,3,3,4,5,5,6,5,7,6,6,4,3,3,3,4,4,3,4,4,4,3,29,58,74,37,19,7,2,2,0,0,0,0,0,0,0,0,0,0,0,2,1,0,1,2,0,2,0,1,1,2,1,2,0,1,2,1,1,1,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,2,0,0,0,0,0,0,1,1,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,2,0,2,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,1,1,1,0,2,3,1,2,1,0,0,1,1,1,0,0,0,0,0,0,1,4,6,5,4,3,3,3,3,3,3,3,3,2,2,2,3,3,3,2,2,2,2,2,24,32,37,18,11,16,19,22,24,10,5,4,2,3,4,4,3,2,3,2,2,4,2,4,4,3,2,2,2,2,1,1,1,1,3,2,2,3,2,2,4,4,4,3,4,3,3,3,3,4,3,3,3,4,3,2,2,2,2,2,2,2,1,3,2,3,3,2,2,2,3,3,3,4,4,5,5,6,7,7,7,6,6,4,3,2,4,2,3,2,2,4,3,2,2,3,2,3,3,3,2,3,2,2,2,2,1,2,3,60,50,77,49,25,17,19,7,3],"ram":[3.77,3.86,3.87,3.87,3.87,3.87,3.86,3.86,3.86,3.86,3.86,3.85,4.22,4.15,4.15,4.15,4.15,4.15,4.15,4.15,4.15,4.15,4.15,4.05,4.08,4.08,4.08,4.08,4.09,4.09,4.08,4.28,4.41,4.41,4.21,4.21,4.19,4.19,4.17,4.41,4.41,4.4,4.37,6.07,5.13,7.07,7.07,6.99,5.92,6.47,6.47,6.47,4.57,5.15,6.24,7.97,5.46,7.93,10.44,11.99,4.96,7.08,9.57,11.53,14.05,16.55,19.07,20.01,19.31,4.42,4.42,4.73,4.53,5.92,4.61,4.59,4.57,4.56,4.54,4.52,4.5,4.49,4.47,4.46,4.44,4.42,4.4,4.39,4.37,4.36,4.35,4.33,4.32,4.31,4.29,4.28,4.26,4.25,4.23,4.21,4.74,4.7,4.62,4.59,4.82,4.83,4.55,4.61,4.67,4.66,4.74,4.89,4.38,4.37,4.37,4.35,4.33,4.33,4.32,4.33,4.68,4.74,4.68,4.66,6.15,7.54,8.25,8.1,7.55,7.46,7.14,7.11,6.18,10.95,9.88,20.32,4.83,4.78,4.77,5.7,4.47,4.46,4.44,4.33,4.27,4.25,4.21,4.14,4.15,4.05,4.05,3.98,3.97,3.97,3.9,3.99,3.99,3.95,3.95,3.95,3.92,3.92,3.92,3.92,3.92,3.92,3.92,5.05,5.05,5.05,5.37,5.02,4.9,4.84,4.77,4.75,4.43,4.62,4.61,4.67,4.68,4.7,4.82,4.8,4.79,4.79,4.78,4.77,4.76,4.76,4.71,4.71,4.7,4.7,4.69,4.68,4.67,4.65,4.63,4.63,4.63,4.7,4.75,4.73,4.72,4.72,4.67,4.67,4.62,4.62,4.57,4.57,4.56,4.49,4.49,4.45,4.44,4.39,4.39,4.39,4.38,4.38,4.38,4.38,4.37,4.38,4.63,4.75,4.97,5.01,4.97,4.94,4.91,4.78,5.58,6.08,6.11,7.01,7.01,6.89,6.17,6.03,6.94,6.94,6.33,6.33,7.33,7.32,7.32,7.32,7.32,7.32,5.41,6.86,6.9,8.37,8.69,7.98,8.3,7.17,7.1,7.02,7.07,7.07,7.13,5.57,4.87,6.13,7.29,6.7,4.8,6.75,8.29,10.3,10.3,4.75,5.36,7.87,9.96,12.31,13.76,16.15,16.33,16.33,14.71,4.76,5.46,7.82,10.24,12.77,15.31,17.86,20.36,21.62,24.04,26.45,28.86,31.28,33.69,36.11,36.36,36.36,36.36,36.36,36.36,36.36,36.1,21.29,5.86,4.77,4.76,4.74,6.03,5.11,5.1,5.07,5.06,5.54,5.88,5.81,5.81,5.77,4.82,5.53,5.82,5.85,5.43,6.34,5.77,6.35,5.87,7.29,6.28,5.19,5.17,5.15,5.12,5.1,5.07,5.05,5.04,5.02,5.0,4.98,4.96,4.94,4.92,4.9,4.88,4.85,4.83,4.81,4.79,4.77,4.75,4.72,4.69,4.67,4.73,4.72,4.36,4.36,4.5,4.49,4.63,4.62,4.63,4.63,4.62,4.62,4.6,4.59,4.24,4.45,4.39,4.37,4.37,4.35,4.37,4.29,4.35,4.27,4.34,4.55,4.51,4.45,4.44,4.66,4.64,4.62,4.59,6.12,7.22,6.67,6.96,5.95,6.67,6.65,6.63,6.61,4.68,5.24,6.64,8.27,5.73,8.2,10.69,12.19,5.12,6.64,9.1,11.6,14.09,16.6,19.1,20.1,20.09,5.91,4.73,5.59,4.64,6.1,6.08,5.67,6.04,4.45,4.43]},"system":{"vendor":"Dell Inc.","product":"Inspiron 14 7425 2-in-1","chassis":"laptop","cpu":"AMD Ryzen 5 5625U with Radeon Graphics","cpu_max_mhz":"4390","physical_cores":"6","logical_cpus":"12","ram_gib":"61.2","ram_type":"DDR4","ram_speed_mts":"3200","ram_modules":"2","ram_module_sizes_gib":"32 32","gpus":"Advanced Micro Devices, Inc. [AMD/ATI] Barcelo (rev c2)","os":"Ubuntu 26.04.1 LTS","kernel":"7.0.0-34-generic","power":"AC","platform_profile":"balanced"},"version_labels":{"C++":"g++ 15.2.0, -O3","Python":"CPython 3.14.7 + NumPy 2.5.3","R":"R 4.5.2","JavaScript":"Node.js v24.21.0"},"newest_batch":{"C++":"20261001-135441","Python":"20261001-135441","R":"20261001-135441","JavaScript":"20261001-135441"},"memory_text":"2 \u00d7 32 GB DDR4-3200, two channels (51.2 GB/s peak)","gpu_text":"AMD Radeon Graphics \u00b7 7 compute units \u00b7 1.8 GHz","runs_text":"three full runs, AC power, balanced profile"}</script>
+<script id="data" type="application/json">__DATA__</script>
 <script>
 (() => {
   const D = JSON.parse(document.getElementById("data").textContent);
@@ -806,5 +792,3 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(renderAll);
 })();
 </script>
-</body>
-</html>

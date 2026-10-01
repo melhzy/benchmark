@@ -7,6 +7,7 @@
 "suite_tests_sha","96c2e949ae9d"
 "vendor","Dell Inc."
 "product","Inspiron 14 7425 2-in-1"
+"chassis","laptop"
 "os","Ubuntu 26.04.1 LTS"
 "kernel","7.0.0-34-generic"
 "arch","x86_64"
