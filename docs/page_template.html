@@ -1,16 +1,17 @@
 <!--
   docs/page_template.html -- template for the results page (docs/index.html).
-  Built by docs/build_page.py: double-brace placeholders are filled with text computed from
-  results/<machine>/, __DATA__ becomes the page's JSON data, and optional:x ... /optional:x
-  comment pairs mark blocks that are dropped when that machine has no data for them.
+  Built by docs/build_page.py: {{h1}} and {{lede}} are filled in, __DATA__ becomes the page's JSON data
+  (every machine with its texts, plus the machine comparison), and the optional:compare ... /optional:compare
+  pair marks the comparison section, dropped when there is only one machine. Everything else is drawn by
+  the script at the end, for the machine chosen in the switcher.
 -->
 <title>Four-Language Benchmark</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,400..800&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
-/* Layout: one reading column (max 1040px); a spec-sheet header, a row of headline scores,
-   then one section per hardware area, each chart with its table underneath. */
+/* Layout: one reading column (max 1040px); a header, the machine comparison, then a sticky machine
+   switcher above one section per hardware area, each chart with its table underneath. */
 :root {
   --bg: #f3f3f0;          /* page plane */
   --surface: #fcfcfb;     /* chart cards */
@@ -45,8 +46,10 @@
   color-scheme: dark;
 }
 body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: var(--step-0); line-height: 1.55; }
-.page { max-width: 1040px; margin: 0 auto; padding-inline: 20px; padding-block: 40px 64px; display: grid; gap: 56px; }
-@media (max-width: 520px) { .page { padding-inline: 16px; padding-block: 24px 48px; gap: 44px; } }
+.page, .machine-view { display: grid; gap: 56px; min-width: 0; }
+.machine-view { scroll-margin-top: 72px; }
+.page { max-width: 1040px; margin: 0 auto; padding-inline: 20px; padding-block: 40px 64px; }
+@media (max-width: 520px) { .page { padding-inline: 16px; padding-block: 24px 48px; } .page, .machine-view { gap: 44px; } }
 h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; line-height: 1.12; }
 h1 { font-size: var(--step-3); font-weight: 780; font-stretch: 118%; letter-spacing: -0.01em; }
 h2 { font-size: var(--step-2); font-weight: 720; font-stretch: 112%; }
@@ -64,7 +67,7 @@ section { display: grid; gap: 18px; min-width: 0; }
 
 /* header */
 header { display: grid; gap: 22px; }
-.spec { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0; border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair); }
+.spec { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0; margin: 0; border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair); }
 .spec div { padding: 12px 16px 12px 0; display: grid; gap: 2px; min-width: 0; }
 .spec dt { font-family: var(--font-data); font-size: var(--step--1); color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
 .spec dd { margin: 0; font-size: 0.95rem; overflow-wrap: anywhere; }
@@ -73,6 +76,24 @@ header { display: grid; gap: 22px; }
 .button:hover { background: var(--wash); }
 .check { display: inline-flex; align-items: center; gap: 8px; color: var(--ink-2); font-size: 0.95rem; }
 .check svg { flex: none; }
+
+/* machine cards (comparison) */
+.machines { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+.mcard { background: var(--surface); border: 1px solid var(--hair); border-radius: 10px; padding: 14px 16px; display: grid; gap: 4px; align-content: start; }
+.mcard .mname { display: flex; align-items: center; gap: 8px; font-weight: 650; }
+.mcard .mos { font-family: var(--font-data); font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.mcard ul { margin: 4px 0 0; padding: 0; list-style: none; color: var(--ink-2); font-size: 0.9rem; display: grid; gap: 2px; }
+
+/* machine switcher: one control above every per-machine section */
+.switcher { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 10px 0; margin-bottom: -38px;
+  border-bottom: 1px solid var(--hair); display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+@media (max-width: 520px) { .switcher { margin-bottom: -30px; } }
+.switcher .lab { font-family: var(--font-data); font-size: var(--step--1); color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 3px; padding: 3px; border: 1px solid var(--hair); border-radius: 8px; background: var(--surface); }
+.seg button { font: inherit; font-size: 0.92rem; border: 0; background: transparent; color: var(--ink-2); padding: 6px 12px; border-radius: 6px; cursor: pointer; }
+.seg button:hover { background: var(--wash); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); font-weight: 600; }
+.mhead { display: grid; gap: 14px; }
 
 /* headline scores */
 .scores { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
@@ -93,6 +114,9 @@ figcaption .t { font-weight: 650; }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
 .legend i { display: inline-block; width: 12px; height: 10px; border-radius: 2px; }
 .legend i.line { height: 2px; width: 16px; border-radius: 1px; }
+.legend i.dot { width: 10px; height: 10px; border-radius: 50%; }
+.legend i.ring { width: 10px; height: 10px; border-radius: 50%; background: transparent !important; box-shadow: inset 0 0 0 2px var(--ink-2); }
+.legend i.fill { width: 10px; height: 10px; border-radius: 50%; background: var(--ink-2) !important; }
 .chart { width: 100%; min-width: 0; }
 .chart svg { display: block; width: 100%; height: auto; overflow: visible; }
 .note { font-size: 0.85rem; color: var(--ink-2); }
@@ -123,10 +147,11 @@ svg text { font-family: var(--font-body); }
 .hit:hover, .hit:focus, .hit.on { fill: var(--wash); outline: none; }
 .phase-label { fill: var(--ink-2); font-size: 11px; font-family: var(--font-data); }
 .crosshair { stroke: var(--ink-2); stroke-width: 1; }
+.stem { stroke: var(--axis); stroke-width: 2; stroke-linecap: round; }
 
 /* tooltip */
 #tip { position: fixed; z-index: 10; pointer-events: none; background: var(--surface); color: var(--ink); border: 1px solid var(--hair);
-  border-radius: 8px; padding: 8px 10px; box-shadow: 0 6px 22px rgba(0, 0, 0, 0.16); font-size: 0.82rem; min-width: 160px; max-width: 300px; }
+  border-radius: 8px; padding: 8px 10px; box-shadow: 0 6px 22px rgba(0, 0, 0, 0.16); font-size: 0.82rem; min-width: 160px; max-width: 320px; }
 #tip .tt { color: var(--ink-2); margin-bottom: 4px; font-family: var(--font-data); font-size: 0.78rem; }
 #tip .tr { display: grid; grid-template-columns: 14px auto 1fr; align-items: center; gap: 2px 8px; }
 #tip .tr i { height: 2px; border-radius: 1px; display: block; }
@@ -148,142 +173,171 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
   <header>
     <div class="eyebrow">Benchmark results · <a href="https://github.com/melhzy/benchmark">github.com/melhzy/benchmark</a></div>
     <h1>{{h1}}</h1>
-    <p class="lede">The same 18 tests, written in C++, Python, R and JavaScript, run on one {{kind}} to see how each language uses its CPU, memory and GPU.</p>
-    <dl class="spec" id="spec"></dl>
+    <p class="lede">{{lede}}</p>
     <div class="actions">
       <a class="button" href="https://github.com/melhzy/benchmark">
         <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
         Code and raw data on GitHub
       </a>
-      <!-- optional:verify -->
-      <span class="check">
-        <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="8" fill="none" stroke="var(--good)" stroke-width="1.6"/><path d="M5.2 9.3l2.4 2.4 5-5.2" fill="none" stroke="var(--good)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        {{verify_badge}}
-      </span>
-      <!-- /optional:verify -->
     </div>
   </header>
 
-  <section aria-labelledby="h-overall">
+  <!-- optional:compare -->
+  <section aria-labelledby="h-compare">
     <div class="section-head">
-      <h2 id="h-overall">Overall speed, relative to C++</h2>
-      <p>Each test's best rate divided by C++'s rate on the same test, averaged geometrically within each hardware area, then across the four areas. 1× is as fast as C++.</p>
+      <h2 id="h-compare">Machine against machine</h2>
+      <p id="compare-text"></p>
     </div>
-    <div class="scores" id="scores"></div>
+    <div class="machines" id="mcards"></div>
+    <div class="scores" id="cmp-scores"></div>
     <figure>
-      <figcaption><span class="t">Score by hardware area</span><div class="legend" id="lg-cat"></div></figcaption>
-      <div class="chart" id="ch-cat"></div>
-      <details><summary>Show as a table</summary><div class="table-wrap" id="tb-cat"></div></details>
+      <figcaption><span class="t" id="cmp-tests-title">Speed on one machine relative to the other, per test</span><div class="legend" id="lg-cmp"></div></figcaption>
+      <div class="chart" id="ch-cmp"></div>
+      <details><summary>Show as a table</summary><div class="table-wrap" id="tb-cmp"></div></details>
     </figure>
+    <figure>
+      <figcaption><span class="t">Speed relative to C++ on the same machine</span><div class="legend" id="lg-gap"></div></figcaption>
+      <p class="note">Does each language's distance from C++ depend on the computer? Each row shows one language on both machines; 1× is as fast as C++ on that machine.</p>
+      <div class="chart" id="ch-gap"></div>
+      <details><summary>Show as a table</summary><div class="table-wrap" id="tb-gap"></div></details>
+    </figure>
+    <ul class="findings" id="cmp-findings"></ul>
   </section>
+  <!-- /optional:compare -->
 
-  <section aria-labelledby="h-tests">
-    <div class="section-head">
-      <h2 id="h-tests">Every test</h2>
-      <p>Speed relative to C++ on a log scale, so 0.01× and 10× fit on one axis. Hover a row for the measured rates and the spread across {{runs_text}}. Plain loops are where Python and R fall furthest behind; library calls are where they catch up.</p>
-    </div>
-    <figure>
-      <figcaption><span class="t">Speed relative to C++, per test</span><div class="legend" id="lg-tests"></div></figcaption>
-      <div class="chart" id="ch-tests"></div>
-      <details><summary>Show measured rates as a table</summary><div class="table-wrap" id="tb-tests"></div></details>
-    </figure>
-  </section>
+  <div class="switcher" role="group" aria-label="Machine shown below">
+    <span class="lab">Showing</span>
+    <div class="seg" id="seg"></div>
+  </div>
 
-  <section aria-labelledby="h-cores">
-    <div class="section-head">
-      <h2 id="h-cores">Using all cores</h2>
-      <p>{{cores_text}}</p>
+  <div class="machine-view" id="view">
+    <div class="mhead">
+      <dl class="spec" id="spec"></dl>
+      <span class="check" id="verify-badge" hidden>
+        <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="8" fill="none" stroke="var(--good)" stroke-width="1.6"/><path d="M5.2 9.3l2.4 2.4 5-5.2" fill="none" stroke="var(--good)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span data-t="verify_badge"></span>
+      </span>
     </div>
-    <figure>
-      <figcaption><span class="t">Speedup over one worker</span><div class="legend" id="lg-par"></div></figcaption>
-      <div class="chart" id="ch-par"></div>
-      <details><summary>Show as a table</summary><div class="table-wrap" id="tb-par"></div></details>
-    </figure>
-  </section>
 
-  <section aria-labelledby="h-mem">
-    <div class="section-head">
-      <h2 id="h-mem">Memory</h2>
-      <p>{{mem_text}}</p>
-    </div>
-    <figure>
-      <figcaption><span class="t">Memory bandwidth</span><div class="legend" id="lg-bw"></div></figcaption>
-      <div class="chart" id="ch-bw"></div>
-      <details><summary>Show as a table</summary><div class="table-wrap" id="tb-bw"></div></details>
-    </figure>
-    <div class="grid-2">
+    <section aria-labelledby="h-overall">
+      <div class="section-head">
+        <h2 id="h-overall">Overall speed, relative to C++</h2>
+        <p>Each test's best rate divided by C++'s rate on the same test and machine, averaged geometrically within each hardware area, then across the four areas. 1× is as fast as C++.</p>
+      </div>
+      <div class="scores" id="scores"></div>
       <figure>
-        <figcaption><span class="t">Allocate, fill and sum one big array</span></figcaption>
-        <div class="legend" id="lg-alloc"></div>
-        <div class="chart" id="ch-alloc"></div>
-        <p class="note">NumPy asks Linux for 2 MB memory pages for big arrays, which cuts the number of page faults when new memory is first touched; the other languages use normal 4 KB pages.</p>
-        <details><summary>Show as a table</summary><div class="table-wrap" id="tb-alloc"></div></details>
+        <figcaption><span class="t">Score by hardware area</span><div class="legend" id="lg-cat"></div></figcaption>
+        <div class="chart" id="ch-cat"></div>
+        <details><summary>Show as a table</summary><div class="table-wrap" id="tb-cat"></div></details>
       </figure>
+    </section>
+
+    <section aria-labelledby="h-tests">
+      <div class="section-head">
+        <h2 id="h-tests">Every test</h2>
+        <p>Speed relative to C++ on a log scale, so 0.01× and 10× fit on one axis. Hover a row for the measured rates and the spread across <span data-t="runs_text"></span>. Plain loops are where Python and R fall furthest behind; library calls are where they catch up.</p>
+      </div>
       <figure>
-        <figcaption><span class="t">Random reads from a 2 GiB array</span></figcaption>
-        <div class="chart" id="ch-gather"></div>
-        <p class="note">Nanoseconds per read; lower is better. Each read is a likely cache miss, so this mostly measures memory latency plus each language's per-element overhead.</p>
+        <figcaption><span class="t">Speed relative to C++, per test</span><div class="legend" id="lg-tests"></div></figcaption>
+        <div class="chart" id="ch-tests"></div>
+        <details><summary>Show measured rates as a table</summary><div class="table-wrap" id="tb-tests"></div></details>
       </figure>
-    </div>
-  </section>
+    </section>
 
-  <!-- optional:gpu -->
-  <section aria-labelledby="h-gpu">
-    <div class="section-head">
-      <h2 id="h-gpu">{{gpu_title}}</h2>
-      <p>{{gpu_text}}</p>
-    </div>
-    <div class="legend" id="lg-gpu"></div>
-    <div class="grid-2" id="gpu-grid"></div>
-  </section>
-  <!-- /optional:gpu -->
+    <section aria-labelledby="h-cores">
+      <div class="section-head">
+        <h2 id="h-cores">Using all cores</h2>
+        <p data-t="cores_text"></p>
+      </div>
+      <figure>
+        <figcaption><span class="t">Speedup over one worker</span><div class="legend" id="lg-par"></div></figcaption>
+        <div class="chart" id="ch-par"></div>
+        <details><summary>Show as a table</summary><div class="table-wrap" id="tb-par"></div></details>
+      </figure>
+    </section>
 
-  <section aria-labelledby="h-peak">
-    <div class="section-head">
-      <h2 id="h-peak">How much of the hardware each language reaches</h2>
-      <p>{{peak_text}}</p>
-    </div>
-    <figure>
-      <figcaption><span class="t">Share of theoretical peak</span><div class="legend" id="lg-util"></div></figcaption>
-      <div class="chart" id="ch-util"></div>
-      <details><summary>Show as a table</summary><div class="table-wrap" id="tb-util"></div></details>
-    </figure>
-  </section>
+    <section aria-labelledby="h-mem">
+      <div class="section-head">
+        <h2 id="h-mem">Memory</h2>
+        <p data-t="mem_text"></p>
+      </div>
+      <figure>
+        <figcaption><span class="t">Memory bandwidth</span><div class="legend" id="lg-bw"></div></figcaption>
+        <div class="chart" id="ch-bw"></div>
+        <details><summary>Show as a table</summary><div class="table-wrap" id="tb-bw"></div></details>
+      </figure>
+      <div class="grid-2">
+        <figure>
+          <figcaption><span class="t">Allocate, fill and sum one big array</span></figcaption>
+          <div class="legend" id="lg-alloc"></div>
+          <div class="chart" id="ch-alloc"></div>
+          <p class="note" data-t="alloc_note"></p>
+          <details><summary>Show as a table</summary><div class="table-wrap" id="tb-alloc"></div></details>
+        </figure>
+        <figure>
+          <figcaption><span class="t">Random reads from a 2 GiB array</span></figcaption>
+          <div class="chart" id="ch-gather"></div>
+          <p class="note">Nanoseconds per read; lower is better. Each read is a likely cache miss, so this mostly measures memory latency plus each language's per-element overhead.</p>
+        </figure>
+      </div>
+    </section>
 
-  <!-- optional:heat -->
-  <section aria-labelledby="h-heat">
-    <div class="section-head">
-      <h2 id="h-heat">Heat and clock speed during a run</h2>
-      <p>{{heat_text}}</p>
-    </div>
-    <figure>
-      <figcaption><span class="t">CPU temperature and average clock, by language</span><span class="note" id="heat-batch"></span></figcaption>
-      <div class="chart" id="ch-heat"></div>
-    </figure>
-  </section>
-  <!-- /optional:heat -->
+    <section aria-labelledby="h-gpu" id="sec-gpu">
+      <div class="section-head">
+        <h2 id="h-gpu" data-t="gpu_title"></h2>
+        <p data-t="gpu_text"></p>
+      </div>
+      <div class="legend" id="lg-gpu"></div>
+      <div class="grid-2" id="gpu-grid"></div>
+    </section>
 
-  <section aria-labelledby="h-find">
-    <div class="section-head"><h2 id="h-find">What the numbers say</h2></div>
-    <ul class="findings">
-{{findings}}
-    </ul>
-  </section>
+    <section aria-labelledby="h-peak">
+      <div class="section-head">
+        <h2 id="h-peak">How much of the hardware each language reaches</h2>
+        <p data-t="peak_text"></p>
+      </div>
+      <figure>
+        <figcaption><span class="t">Share of theoretical peak</span><div class="legend" id="lg-util"></div></figcaption>
+        <div class="chart" id="ch-util"></div>
+        <details><summary>Show as a table</summary><div class="table-wrap" id="tb-util"></div></details>
+      </figure>
+    </section>
+
+    <section aria-labelledby="h-heat" id="sec-heat">
+      <div class="section-head">
+        <h2 id="h-heat" data-t="heat_title"></h2>
+        <p data-t="heat_text"></p>
+      </div>
+      <figure>
+        <figcaption><span class="t" id="heat-caption">CPU temperature and average clock, by language</span><span class="note" id="heat-batch"></span></figcaption>
+        <div class="chart" id="ch-heat"></div>
+      </figure>
+    </section>
+
+    <section aria-labelledby="h-find">
+      <div class="section-head"><h2 id="h-find">What the numbers say</h2></div>
+      <ul class="findings" id="findings"></ul>
+    </section>
+  </div>
 
   <section aria-labelledby="h-method">
     <div class="section-head"><h2 id="h-method">How it was measured</h2></div>
     <div class="method">
-      <p>Each language implements the same specification: the same algorithms, the same inputs (generated from one formula, not each language's random generator) and the same output format. Loop-heavy tests use smaller sizes in Python and R, and every result is a rate (work per second), so sizes don't affect the comparison. Each test runs five times after a warm-up; the median counts. The figures above come from the newest full run of each language; the run-to-run spread is in the tooltips ({{spread_text}}).</p>
-      <p>Before each language, the runner waits for the CPU to cool below 60 °C. {{power_text}} {{verify_text}}</p>
-      <p>To add a machine, clone the repository and run:</p>
+      <p>Each language implements the same specification: the same algorithms, the same inputs (generated from one formula, not each language's random generator) and the same output format. Loop-heavy tests use smaller sizes in Python and R, and every result is a rate (work per second), so sizes don't affect the comparison. Each test runs five times after a warm-up; the median counts. The figures above come from the newest full run of each language; the run-to-run spread is in the tooltips (on the <span data-t="machine_name"></span>, <span data-t="spread_text"></span>).</p>
+      <p><span data-t="cool_text"></span> <span data-t="power_text"></span> <span data-t="verify_text"></span> <span data-t="minutes_text"></span></p>
+      <p>To add a machine, clone the repository and run, on Linux:</p>
       <pre>./run_all.sh --check     # what is installed, per language
-./run_all.sh             # {{minutes_text}}; results go to results/&lt;machine&gt;/</pre>
+./run_all.sh             # full run; results go to results/&lt;machine&gt;/</pre>
+      <p>or on Windows (PowerShell or cmd):</p>
+      <pre>powershell -ExecutionPolicy Bypass -File setup_windows.ps1   # OpenBLAS, OpenCL SDK, packages
+.\run_all.cmd --check
+.\run_all.cmd</pre>
       <p>Full definitions are in <a href="https://github.com/melhzy/benchmark/blob/main/common/SPEC.md">common/SPEC.md</a>, and the analysis notebook with more charts is <a href="https://github.com/melhzy/benchmark/blob/main/analysis.ipynb">analysis.ipynb</a>.</p>
     </div>
   </section>
 
   <footer>
-    <span>Results from {{date_text}} · {{machine_name}}</span>
+    <span id="foot-dates"></span>
     <span>MIT License · <a href="https://github.com/melhzy/benchmark">melhzy/benchmark</a></span>
   </footer>
 </div>
@@ -292,8 +346,10 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
 <script id="data" type="application/json">__DATA__</script>
 <script>
 (() => {
-  const D = JSON.parse(document.getElementById("data").textContent);
-  const LANGS = D.langs;
+  const ALL = JSON.parse(document.getElementById("data").textContent);
+  const CMP = ALL.compare;
+  const BY_ID = Object.fromEntries(ALL.machines.map((m) => [m.id, m]));
+  let D = null, LANGS = [], S = null, T = null;     // the machine shown in the per-machine sections
   const KEY = { "C++": "cpp", "Python": "py", "R": "r", "JavaScript": "js" };
   const col = (l) => `var(--c-${KEY[l]})`;
   const CAT = { cpu_single: "CPU, one core", cpu_multi: "CPU, all cores", ram: "RAM", gpu: "GPU" };
@@ -310,6 +366,7 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
   const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
   const num = (v) => v == null ? "–" : (Math.abs(v) >= 1000 ? nf0.format(v) : nf3.format(v));
   const times = (v) => v == null ? "–" : (v >= 10 ? nf0.format(v) : new Intl.NumberFormat("en-US", { maximumSignificantDigits: 2 }).format(v)) + "×";
+  const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
 
   function svgEl(tag, attrs = {}, parent) {
     const e = document.createElementNS(NS, tag);
@@ -328,7 +385,7 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
     for (const l of langs) {
       const s = document.createElement("span");
       const i = document.createElement("i");
-      if (kind === "line") i.className = "line";
+      if (kind !== "bar") i.className = kind;
       i.style.background = col(l);
       s.append(i, document.createTextNode(l));
       box.appendChild(s);
@@ -411,25 +468,22 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
     return `M${x0},${y}H${x1 - r}Q${x1},${y} ${x1},${y + r}V${y + h - r}Q${x1},${y + h} ${x1 - r},${y + h}H${x0}Z`;
   }
 
-  // ---------------------------------------------------------------- grouped horizontal bars
-  // rows: [{label, sub, header?}], series: languages, get(row, lang) -> value
-  function hbars(id, o) {
+  // ---------------------------------------------------------------- row layout shared by bars and dots
+  // rows: [{label, sub, header?}]; returns the layout plus an svg with gridlines, ticks and refs drawn.
+  function rowFrame(id, o, rowHeight) {
     const box = document.getElementById(id);
     const W = Math.max(280, box.clientWidth);
     const narrow = W < 560;
     const labelW = o.labelW ? o.labelW(narrow) : (narrow ? 118 : 190);
     const right = narrow ? 52 : 70, top = 6, bottom = 30;
-    const barH = Math.min(o.barH || 9, 24), gap = 2;
-    const series = o.series;
-    const rows = o.rows;
     let y = top;
-    const layout = rows.map((r) => {
+    const layout = o.rows.map((r) => {
       if (r.header) { const at = y + (y > top ? 14 : 0); y = at + 24; return { r, y: at, header: true }; }
-      const h = series.length * (barH + gap) - gap;
       const pad = o.rowPad ?? (narrow ? 10 : 12);
       const sub = r.sub && !narrow ? 12 : 0;
-      const rowH = Math.max(h, sub ? 30 : 0) + pad * 2;
-      const item = { r, y, h: rowH, barsY: y + (rowH - h) / 2 };
+      const inner = rowHeight();
+      const rowH = Math.max(inner, sub ? 30 : 0) + pad * 2;
+      const item = { r, y, h: rowH, innerY: y + (rowH - inner) / 2, inner };
       y += rowH;
       return item;
     });
@@ -442,7 +496,7 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
       svgEl("line", { x1: tx, x2: tx, y1: top, y2: H - bottom + 4, class: "gridline" }, g);
       text(g, tx, H - bottom + 18, o.tickFmt(t), "tick axis-label", { "text-anchor": "middle" });
     }
-    svgEl("line", { x1: labelW, x2: labelW, y1: top, y2: H - bottom, class: "baseline" }, g);
+    if (o.scale !== "log") svgEl("line", { x1: labelW, x2: labelW, y1: top, y2: H - bottom, class: "baseline" }, g);
     for (const ref of o.refs || []) {
       const rx = x(ref.x);
       svgEl("line", { x1: rx, x2: rx, y1: top, y2: H - bottom, class: "ref" }, g);
@@ -450,7 +504,7 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
     }
     for (const it of layout) {
       if (it.header) { text(g, 0, it.y + 14, it.r.label, "group-label"); continue; }
-      const hit = svgEl("rect", { x: 0, y: it.y, width: W, height: it.h, class: "hit", rx: 4 }, g);
+      it.hit = svgEl("rect", { x: 0, y: it.y, width: W, height: it.h, class: "hit", rx: 4 }, g);
       const cy = it.y + it.h / 2;
       if (it.r.sub && !narrow) {
         text(g, 0, cy - 2, it.r.label, "row-label");
@@ -458,18 +512,53 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
       } else {
         text(g, 0, cy + 4, it.r.label, "row-label");
       }
-      series.forEach((l, i) => {
-        const v = o.get(it.r, l);
-        const by = it.barsY + i * (barH + gap);
-        if (v == null || !(v > 0)) return;
-        const x1 = Math.max(x(v), labelW + 2);
-        svgEl("path", { d: barPath(labelW, x1, by, barH), style: `fill:${o.color ? o.color(it.r, l) : col(l)}`, "pointer-events": "none" }, g);
-        if (o.valueLabels !== false) text(g, x1 + 5, by + barH - 1, o.valFmt(v, it.r, l), "val", { "pointer-events": "none" });
-      });
-      bindTip(hit, () => o.tip(it.r));
-      hit.setAttribute("aria-label", o.ariaRow ? o.ariaRow(it.r) : it.r.label);
     }
-    box.replaceChildren(svg);
+    return { box, svg, g, x, labelW, layout, narrow };
+  }
+
+  // grouped horizontal bars: series: languages, get(row, lang) -> value
+  function hbars(id, o) {
+    const barH = Math.min(o.barH || 9, 24), gap = 2;
+    const f = rowFrame(id, o, () => o.series.length * (barH + gap) - gap);
+    const x0 = o.scale === "log" ? f.x(o.domain[0]) : f.labelW;
+    for (const it of f.layout) {
+      if (it.header) continue;
+      o.series.forEach((l, i) => {
+        const v = o.get(it.r, l);
+        const by = it.innerY + i * (barH + gap);
+        if (v == null || !(v > 0)) return;
+        const x1 = Math.max(f.x(v), x0 + 2);
+        svgEl("path", { d: barPath(x0, x1, by, barH), style: `fill:${o.color ? o.color(it.r, l) : col(l)}`, "pointer-events": "none" }, f.g);
+        if (o.valueLabels !== false) text(f.g, x1 + 5, by + barH - 1, o.valFmt(v, it.r, l), "val", { "pointer-events": "none" });
+      });
+      bindTip(it.hit, () => o.tip(it.r));
+      it.hit.setAttribute("aria-label", o.ariaRow ? o.ariaRow(it.r) : it.r.label);
+    }
+    f.box.replaceChildren(f.svg);
+  }
+
+  // dots on one line per row: points(row) -> [{x, lang, shape: "dot" | "ring"}]; a stem joins each row's extremes
+  function hdots(id, o) {
+    const R = 5.5;
+    const f = rowFrame(id, { ...o, rowPad: o.rowPad ?? 4 }, () => 2 * R + 4);
+    for (const it of f.layout) {
+      if (it.header) continue;
+      const cy = it.innerY + it.inner / 2;
+      const pts = o.points(it.r).filter((p) => p.x != null && p.x > 0);
+      if (o.stem && pts.length > 1) {
+        const xs = pts.map((p) => f.x(p.x));
+        svgEl("line", { x1: Math.min(...xs), x2: Math.max(...xs), y1: cy, y2: cy, class: "stem", "pointer-events": "none" }, f.g);
+      }
+      for (const p of pts) {
+        const c = col(p.lang);
+        svgEl("circle", p.shape === "ring"
+          ? { cx: f.x(p.x), cy, r: R - 1, style: `fill:var(--surface);stroke:${c}`, "stroke-width": 2.5, "pointer-events": "none" }
+          : { cx: f.x(p.x), cy, r: R, style: `fill:${c}`, stroke: "var(--surface)", "stroke-width": 2, "pointer-events": "none" }, f.g);
+      }
+      bindTip(it.hit, () => o.tip(it.r));
+      it.hit.setAttribute("aria-label", o.ariaRow ? o.ariaRow(it.r) : it.r.label);
+    }
+    f.box.replaceChildren(f.svg);
   }
 
   // ---------------------------------------------------------------- line chart with crosshair
@@ -485,7 +574,8 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
       svgEl("line", { x1: L, x2: W - R, y1: y(t), y2: y(t), class: "gridline" }, svg);
       text(svg, L - 8, y(t) + 4, o.yFmt(t), "tick axis-label", { "text-anchor": "end" });
     }
-    for (const t of o.xs) text(svg, x(t), H - B + 18, o.xFmt(t), "tick axis-label", { "text-anchor": "middle" });
+    const xLabelled = o.xs.filter((t, i) => !narrow || o.xs.length <= 6 || i % 2 === 0 || i === o.xs.length - 1);
+    for (const t of xLabelled) text(svg, x(t), H - B + 18, o.xFmt(t), "tick axis-label", { "text-anchor": "middle" });
     svgEl("line", { x1: L, x2: W - R, y1: H - B, y2: H - B, class: "baseline" }, svg);
     if (o.xLabel) text(svg, (L + W - R) / 2, H - 2, o.xLabel, "axis-label", { "text-anchor": "middle" });
     if (o.vline) {
@@ -538,54 +628,138 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
     box.replaceChildren(svg);
   }
 
-  // ---------------------------------------------------------------- page content
-  const S = D.system;
-  const spec = [
-    ["Machine", `${S.vendor.replace(/ Inc\.$/, "")} ${S.product}`],
-    ["CPU", `${S.cpu.replace(/ with .*Graphics$/, "")} · ${S.physical_cores} cores / ${S.logical_cpus} threads · up to ${(S.cpu_max_mhz / 1000).toFixed(1)} GHz`],
-    ["Memory", D.memory_text],
-    ["GPU", D.gpu_text],
-    ["System", `${S.os} · Linux ${S.kernel.split("-")[0]}`],
-    ["Runs", D.runs_text],
-  ];
-  const dl = document.getElementById("spec");
-  for (const [k, v] of spec) {
-    const d = document.createElement("div"), dt = document.createElement("dt"), dd = document.createElement("dd");
-    dt.textContent = k; dd.textContent = v; d.append(dt, dd); dl.appendChild(d);
-  }
-  const VER = D.version_labels;
-  const scores = document.getElementById("scores");
-  for (const l of LANGS) {
-    const c = document.createElement("div"); c.className = "score";
-    const who = document.createElement("div"); who.className = "who";
-    const k = document.createElement("span"); k.className = "key"; k.style.background = col(l);
-    who.append(k, document.createTextNode(l));
-    const ver = document.createElement("div"); ver.className = "ver"; ver.textContent = VER[l];
-    const big = document.createElement("div"); big.className = "big"; big.textContent = times(D.overall[l]);
-    const cap = document.createElement("div"); cap.className = "cap";
-    cap.textContent = l === "C++" ? "the reference" : `of C++ speed overall`;
-    c.append(who, ver, big, cap); scores.appendChild(c);
+  // ---------------------------------------------------------------- machine comparison
+  function renderCompare() {
+    if (!CMP || !document.getElementById("ch-cmp")) return;
+    const base = BY_ID[CMP.base], other = BY_ID[CMP.others[CMP.others.length - 1]];
+    const name = (m) => m.T.machine_name, short = (m) => `${m.T.machine_name} (${m.T.os_family})`;
+    const langs = CMP.langs;
+    document.getElementById("compare-text").textContent = CMP.text.compare_text;
+
+    // machine cards
+    const cards = document.getElementById("mcards");
+    if (!cards.children.length) {
+      for (const m of ALL.machines) {
+        const c = el("div", "mcard");
+        c.append(el("div", "mos", m.T.os_family), el("div", "mname", m.T.machine_name));
+        const ul = el("ul");
+        for (const [k, v] of m.T.spec.slice(1, 5)) ul.appendChild(el("li", null, v));
+        c.appendChild(ul); cards.appendChild(c);
+      }
+    }
+
+    // headline: how much faster each language is on the other machine
+    const ov = CMP.overall[other.id];
+    const sc = document.getElementById("cmp-scores");
+    sc.replaceChildren();
+    for (const l of langs) {
+      const c = el("div", "score");
+      const who = el("div", "who"); const k = el("span", "key"); k.style.background = col(l);
+      who.append(k, document.createTextNode(l));
+      c.append(who, el("div", "big", times(ov[l])), el("div", "cap", `as fast on the ${name(other)} as on the ${name(base)}`));
+      sc.appendChild(c);
+    }
+
+    // per test: speed on the other machine / speed on the reference machine (log scale)
+    document.getElementById("cmp-tests-title").textContent = `Speed on the ${name(other)} relative to the ${name(base)}, per test`;
+    legend("lg-cmp", langs, "dot");
+    const rows = [];
+    for (const c of ["cpu_single", "cpu_multi", "ram", "gpu"]) {
+      const ts = CMP.tests.filter((t) => t.category === c);
+      if (!ts.length) continue;
+      rows.push({ header: true, label: CAT[c] });
+      for (const t of ts) rows.push({ label: t.test, sub: DESC[t.test], t });
+    }
+    const r = (t, l) => t.ratio[other.id][l];
+    const range = logRange(CMP.tests.flatMap((t) => langs.map((l) => r(t, l))), 5);
+    hdots("ch-cmp", {
+      rows, scale: "log", domain: range.domain, ticks: range.ticks, rowPad: 5,
+      tickFmt: (t) => t === 1 ? "1× = same" : `${+t.toPrecision(3)}×`, refs: [{ x: 1, label: "" }],
+      points: (row) => langs.map((l) => ({ x: r(row.t, l), lang: l, shape: "dot" })),
+      aria: `Dot plot: speed of each language on the ${name(other)} relative to the ${name(base)}, per test`,
+      ariaRow: (row) => `${row.label}: ` + langs.map((l) => `${l} ${times(r(row.t, l))}`).join(", "),
+      tip: (row) => ({ title: `${row.t.test} · ${name(other)} vs ${name(base)}`,
+        rows: langs.filter((l) => r(row.t, l) != null).sort((a, b) => r(row.t, b) - r(row.t, a))
+          .map((l) => ({ color: col(l), value: times(r(row.t, l)), label: l })),
+        note: "right of the line: faster on the " + name(other) }),
+    });
+    table("tb-cmp", ["Test", ...langs], CMP.tests.map((t) => [t.test, ...langs.map((l) => times(r(t, l)))]));
+
+    // gap to C++ on each machine: a ring for the reference machine, a filled dot for the other, joined by a stem
+    const lg = document.getElementById("lg-gap");
+    lg.replaceChildren();
+    const sw = (cls, txt) => { const s = el("span"); s.append(el("i", cls), document.createTextNode(txt)); return s; };
+    lg.append(sw("ring", short(base)), sw("fill", short(other)));
+    const others = langs.filter((l) => l !== "C++");
+    const grows = [];
+    for (const c of [...["cpu_single", "cpu_multi", "ram", "gpu"].filter((c) => base.categories[c] && other.categories[c]), "overall"]) {
+      grows.push({ header: true, label: c === "overall" ? "Overall" : CAT[c] });
+      for (const l of others) grows.push({ label: l, lang: l, c });
+    }
+    const gv = (m, c, l) => c === "overall" ? m.overall[l] : (m.categories[c] || {})[l];
+    const grange = logRange(grows.filter((g) => !g.header).flatMap((g) => [gv(base, g.c, g.lang), gv(other, g.c, g.lang)]));
+    hdots("ch-gap", {
+      rows: grows, scale: "log", domain: grange.domain, ticks: grange.ticks, stem: true, labelW: (n) => n ? 96 : 130,
+      tickFmt: fmtX, refs: [{ x: 1, label: "" }], rowPad: 3,
+      points: (g) => [{ x: gv(base, g.c, g.lang), lang: g.lang, shape: "ring" }, { x: gv(other, g.c, g.lang), lang: g.lang, shape: "dot" }],
+      aria: "Dumbbell chart: each language's speed relative to C++ on each machine",
+      ariaRow: (g) => `${g.lang}: ${times(gv(base, g.c, g.lang))} on the ${name(base)}, ${times(gv(other, g.c, g.lang))} on the ${name(other)}`,
+      tip: (g) => ({ title: `${g.lang} · ${g.c === "overall" ? "overall" : CAT[g.c]} · relative to C++`,
+        rows: [{ color: col(g.lang), value: times(gv(base, g.c, g.lang)), label: short(base) },
+               { color: col(g.lang), value: times(gv(other, g.c, g.lang)), label: short(other) }], note: "1× = as fast as C++ on the same machine" }),
+    });
+    table("tb-gap", ["Area", "Language", short(base), short(other)],
+      grows.filter((g) => !g.header).map((g) => [g.c === "overall" ? "Overall" : CAT[g.c], g.lang, times(gv(base, g.c, g.lang)), times(gv(other, g.c, g.lang))]), 2);
+
+    document.getElementById("cmp-findings").innerHTML = CMP.text.compare_findings;
   }
 
-  const others = LANGS.filter((l) => l !== "C++");
-  const cats = ["cpu_single", "cpu_multi", "ram", "gpu"];
+  // ---------------------------------------------------------------- one machine
   const ratio = (t, l) => (t.rate[l] != null && t.rate["C++"]) ? t.rate[l] / t.rate["C++"] : null;
   const rangeNote = (t, l) => { const r = t.range[l]; return r ? `${num(r[0])}–${num(r[1])} over ${r[2]} runs` : ""; };
 
-  function renderAll() {
+  function fillText() {
+    for (const node of document.querySelectorAll("[data-t]")) node.textContent = T[node.dataset.t] ?? "";
+    const dl = document.getElementById("spec");
+    dl.replaceChildren();
+    for (const [k, v] of T.spec) {
+      const d = el("div"); d.append(el("dt", null, k), el("dd", null, v)); dl.appendChild(d);
+    }
+    document.getElementById("verify-badge").hidden = !T.verify_badge;
+    document.getElementById("findings").innerHTML = T.findings;
+    document.getElementById("sec-gpu").hidden = !D.tests.some((t) => t.category === "gpu");
+    document.getElementById("sec-heat").hidden = !D.sensors;
+    const scores = document.getElementById("scores");
+    scores.replaceChildren();
+    for (const l of LANGS) {
+      const c = el("div", "score");
+      const who = el("div", "who"); const k = el("span", "key"); k.style.background = col(l);
+      who.append(k, document.createTextNode(l));
+      c.append(who, el("div", "ver", D.version_labels[l]), el("div", "big", times(D.overall[l])),
+               el("div", "cap", l === "C++" ? "the reference" : "of C++ speed overall"));
+      scores.appendChild(c);
+    }
+    document.getElementById("foot-dates").textContent = "Results from " +
+      ALL.machines.map((m) => `${m.T.date_text} (${m.T.machine_name})`).join(" and ");
+  }
+
+  function renderMachine() {
+    const others = LANGS.filter((l) => l !== "C++");
+    const cats = ["cpu_single", "cpu_multi", "ram", "gpu"];
+
     // score by category
     legend("lg-cat", others);
     const catRows = [...cats.filter((c) => D.categories[c]).map((c) => ({ key: c, label: CAT[c] })), { key: "overall", label: "Overall" }];
-    const catRange = logRange(catRows.flatMap((r) => others.map((l) => r.key === "overall" ? D.overall[l] : D.categories[r.key][l])));
+    const catVal = (r, l) => r.key === "overall" ? D.overall[l] : D.categories[r.key][l];
+    const catRange = logRange(catRows.flatMap((r) => others.map((l) => catVal(r, l))));
     hbars("ch-cat", {
       rows: catRows, series: others, scale: "log", domain: catRange.domain, ticks: catRange.ticks,
       tickFmt: fmtX, barH: 12, labelW: (n) => n ? 110 : 150,
-      get: (r, l) => r.key === "overall" ? D.overall[l] : D.categories[r.key][l],
-      valFmt: (v) => times(v), refs: [{ x: 1, label: "" }],
+      get: catVal, valFmt: (v) => times(v), refs: [{ x: 1, label: "" }],
       aria: "Bar chart: speed of Python, R and JavaScript relative to C++, per hardware area",
-      tip: (r) => ({ title: r.label, rows: others.map((l) => ({ color: col(l), value: times(r.key === "overall" ? D.overall[l] : D.categories[r.key][l]), label: l })), note: "C++ = 1×" }),
+      tip: (r) => ({ title: r.label, rows: others.map((l) => ({ color: col(l), value: times(catVal(r, l)), label: l })), note: "C++ = 1×" }),
     });
-    table("tb-cat", ["Area", ...LANGS], catRows.map((r) => [r.label, ...LANGS.map((l) => times(r.key === "overall" ? D.overall[l] : D.categories[r.key][l]))]));
+    table("tb-cat", ["Area", ...LANGS], catRows.map((r) => [r.label, ...LANGS.map((l) => times(catVal(r, l)))]));
 
     // every test
     legend("lg-tests", others);
@@ -600,7 +774,7 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
       rows: testRows, series: others, scale: "log", domain: testRange.domain, ticks: testRange.ticks,
       tickFmt: fmtX, barH: 11, rowPad: 6,
       get: (r, l) => ratio(r.t, l), valFmt: (v) => times(v), refs: [{ x: 1, label: "" }],
-      aria: "Bar chart: speed relative to C++ for each of the 18 tests",
+      aria: `Bar chart: speed relative to C++ for each of the ${D.tests.length} tests`,
       tip: (r) => ({
         title: `${r.t.test} · ${r.t.unit}`,
         rows: LANGS.map((l) => ({ color: col(l), value: num(r.t.rate[l]), label: l === "C++" ? "C++" : `${l} (${times(ratio(r.t, l))})` }))
@@ -612,17 +786,17 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
 
     // parallel scaling
     legend("lg-par", LANGS, "line");
-    const maxW = Math.max(...D.workers), parTop = Math.max(maxW, ...LANGS.flatMap((l) => D.parallel[l] || []));
+    const maxW = Math.max(...D.workers), parTop = Math.max(maxW, ...LANGS.flatMap((l) => (D.parallel[l] || []).filter((v) => v != null)));
     lines("ch-par", {
       xs: D.workers, xDomain: [1, maxW], yDomain: [0, parTop * 1.04], yTicks: niceTicks(parTop, 6),
       series: LANGS.map((l) => ({ lang: l, values: D.parallel[l] })),
       yFmt: (t) => `${t}×`, xFmt: (t) => t, xLabel: "workers", height: 320,
       ideal: (t) => t, vline: { x: +S.physical_cores, label: `${S.physical_cores} physical cores` },
-      endFmt: (s, v) => `${s.lang} ${nf3.format(v)}×`, tipFmt: (v) => `${nf3.format(v)}×`,
+      endFmt: (s, v) => `${s.lang} ${nf3.format(v)}×`, tipFmt: (v) => v == null ? "–" : `${nf3.format(v)}×`,
       tipTitle: (w) => `${w} worker${w > 1 ? "s" : ""}`, tipNote: (w) => `perfect scaling: ${w}×`,
-      aria: "Line chart: speedup over one worker for 1 to 12 workers",
+      aria: `Line chart: speedup over one worker for 1 to ${maxW} workers`,
     });
-    table("tb-par", ["Workers", ...LANGS], D.workers.map((w, i) => [String(w), ...LANGS.map((l) => `${nf3.format(D.parallel[l][i])}×`)]));
+    table("tb-par", ["Workers", ...LANGS], D.workers.map((w, i) => [String(w), ...LANGS.map((l) => D.parallel[l][i] == null ? "–" : `${nf3.format(D.parallel[l][i])}×`)]));
 
     // memory bandwidth
     legend("lg-bw", LANGS);
@@ -636,7 +810,7 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
       tickFmt: (t) => `${t}`, barH: 9, get: (r, l) => r.get(l) ?? null, valFmt: (v) => `${nf3.format(v)} GB/s`,
       refs: D.peaks.ram ? [{ x: D.peaks.ram, label: `peak ${D.peaks.ram}` }] : [], labelW: (n) => n ? 96 : 150,
       aria: "Bar chart: memory bandwidth in GB/s",
-      tip: (r) => ({ title: `${r.label}, ${r.sub}`, rows: LANGS.filter((l) => r.get(l) != null).map((l) => ({ color: col(l), value: `${nf3.format(r.get(l))} GB/s`, label: l })), note: `theoretical peak ${D.peaks.ram} GB/s` }),
+      tip: (r) => ({ title: `${r.label}, ${r.sub}`, rows: LANGS.filter((l) => r.get(l) != null).map((l) => ({ color: col(l), value: `${nf3.format(r.get(l))} GB/s`, label: l })), note: D.peaks.ram ? `theoretical peak ${D.peaks.ram} GB/s` : "" }),
     });
     table("tb-bw", ["Test", ...LANGS], bwRows.map((r) => [`${r.label}, ${r.sub}`, ...LANGS.map((l) => r.get(l) != null ? nf3.format(r.get(l)) : "–")]));
 
@@ -650,7 +824,7 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
       yFmt: (t) => `${t}`, xFmt: (t) => `${t} GiB`, xLabel: "array size (GB/s written + read)",
       endFmt: (s, v) => `${s.lang} ${nf3.format(v)}`, tipFmt: (v) => v == null ? "skipped" : `${nf3.format(v)} GB/s`,
       tipTitle: (s) => `${s} GiB array`, tipNote: (s) => LANGS.filter((l) => D.alloc_seconds[l][D.alloc_sizes.indexOf(s)] != null).map((l) => `${l} ${D.alloc_seconds[l][D.alloc_sizes.indexOf(s)]} s`).join(" · "),
-      aria: "Line chart: allocation speed in GB/s for arrays of 1 to 16 GiB",
+      aria: `Line chart: allocation speed in GB/s for arrays of ${Math.min(...D.alloc_sizes)} to ${Math.max(...D.alloc_sizes)} GiB`,
     });
     table("tb-alloc", ["GiB", ...LANGS.map((l) => `${l} GB/s`)], D.alloc_sizes.map((s, i) => [String(s), ...LANGS.map((l) => D.alloc[l][i] == null ? "–" : nf3.format(D.alloc[l][i]))]));
 
@@ -665,26 +839,25 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
       tip: (r) => ({ title: "random reads from 2 GiB", rows: [{ color: col(r.lang), value: `${nf3.format(1000 / gather.rate[r.lang])} ns`, label: `${r.lang} · ${num(gather.rate[r.lang])} M reads/s` }] }),
     });
 
-    // GPU small multiples (the section is absent when the machine has no GPU results)
+    // GPU small multiples (rebuilt for each machine; the section is hidden when it has no GPU results)
     const grid = document.getElementById("gpu-grid");
-    if (grid) legend("lg-gpu", LANGS);
-    if (grid && !grid.children.length) {
-      for (const t of D.tests.filter((t) => t.category === "gpu")) {
-        const f = document.createElement("figure");
-        const cap = document.createElement("figcaption"); const s = document.createElement("span"); s.className = "t";
-        s.textContent = `${DESC[t.test]} (${t.unit})`; cap.appendChild(s);
-        const pk = t.unit === "GFLOP/s" ? D.peaks.gpu_fp32 : (t.test === "gpu_bandwidth" ? D.peaks.ram : null);
-        if (pk) { const n = document.createElement("span"); n.className = "note"; n.textContent = `line: peak ${nf0.format(pk)}`; cap.appendChild(n); }
-        const ch = document.createElement("div"); ch.className = "chart"; ch.id = `ch-${t.test}`;
-        f.append(cap, ch); grid.appendChild(f);
-      }
+    grid.replaceChildren();
+    legend("lg-gpu", LANGS);
+    const gpuTests = D.tests.filter((t) => t.category === "gpu");
+    const peakOf = (t) => t.unit === "GFLOP/s" ? D.peaks.gpu_fp32 : (t.test === "gpu_bandwidth" ? D.peaks.gpu_mem : null);
+    for (const t of gpuTests) {
+      const f = el("figure");
+      const cap = el("figcaption"); cap.appendChild(el("span", "t", `${DESC[t.test]} (${t.unit})`));
+      const pk = peakOf(t);
+      if (pk) cap.appendChild(el("span", "note", `line: peak ${nf0.format(pk)}`));
+      const ch = el("div", "chart"); ch.id = `ch-${t.test}`;
+      f.append(cap, ch); grid.appendChild(f);
     }
-    for (const t of grid ? D.tests.filter((t) => t.category === "gpu") : []) {
-      const peak = t.unit === "GFLOP/s" ? D.peaks.gpu_fp32 : (t.test === "gpu_bandwidth" ? D.peaks.ram : null);
+    for (const t of gpuTests) {
+      const peak = peakOf(t);
       const max = Math.max(...LANGS.map((l) => t.rate[l] || 0));
-      const top = peak ? peak * 1.06 : max * 1.25;
-      const step = top > 1000 ? 400 : top > 100 ? 50 : top > 40 ? 10 : top > 10 ? 5 : 1;
-      const ticks = []; for (let v = 0; v <= top; v += step) ticks.push(v);
+      const top = peak ? Math.max(peak, max) * 1.06 : max * 1.25;
+      const ticks = niceTicks(top * 0.95, 4);
       hbars(`ch-${t.test}`, {
         rows: LANGS.map((l) => ({ label: l, lang: l })), series: ["_"], scale: "linear", domain: [0, top], ticks,
         tickFmt: (v) => nf0.format(v), barH: 12, rowPad: 5, labelW: () => 88,
@@ -701,23 +874,34 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
     hbars("ch-util", {
       rows: D.util.map((u) => ({ label: u.name.split(" (")[0], sub: u.name.includes("(") ? u.name.split(" (")[1].replace(")", "") : "", u })),
       series: LANGS, scale: "linear", domain: [0, 100], ticks: [0, 25, 50, 75, 100], tickFmt: (t) => `${t}%`, barH: 9,
-      labelW: (n) => n ? 120 : 200, get: (r, l) => r.u.pct[l], valFmt: (v) => `${Math.round(v)}%`,
+      labelW: (n) => n ? 120 : 200, get: (r, l) => r.u.pct[l], valFmt: (v) => `${v < 1 ? nf3.format(v) : Math.round(v)}%`,
       aria: "Bar chart: share of theoretical peak reached by each language",
-      tip: (r) => ({ title: r.u.name, rows: LANGS.map((l) => ({ color: col(l), value: `${nf3.format(r.u.pct[l])}%`, label: l })), note: `peak ${nf0.format(r.u.peak)} ${r.u.unit}` }),
+      tip: (r) => ({ title: r.u.name, rows: LANGS.map((l) => ({ color: col(l), value: r.u.pct[l] == null ? "–" : `${nf3.format(r.u.pct[l])}%`, label: l })), note: `peak ${nf0.format(r.u.peak)} ${r.u.unit}` }),
     });
-    table("tb-util", ["Resource", "Peak", ...LANGS], D.util.map((u) => [u.name, `${nf0.format(u.peak)} ${u.unit}`, ...LANGS.map((l) => `${nf3.format(u.pct[l])}%`)]));
+    table("tb-util", ["Resource", "Peak", ...LANGS], D.util.map((u) => [u.name, `${nf0.format(u.peak)} ${u.unit}`, ...LANGS.map((l) => u.pct[l] == null ? "–" : `${nf3.format(u.pct[l])}%`)]));
 
-    if (D.sensors && document.getElementById("ch-heat")) heat();
+    if (D.sensors) heat();
   }
 
   // ---------------------------------------------------------------- sensor timeline
   function heat() {
     const s = D.sensors, box = document.getElementById("ch-heat");
     document.getElementById("heat-batch").textContent = `run ${s.batch}`;
+    const temps = s.cpu_temp.filter((v) => v != null), mhz = s.cpu_mhz.filter((v) => v != null);
+    document.getElementById("heat-caption").textContent = temps.length ? "CPU temperature and average clock, by language" : "Average CPU clock, by language";
     const W = Math.max(280, box.clientWidth), narrow = W < 520;
-    const L = narrow ? 42 : 52, R = 12, T = 22, gapY = 26, pH = narrow ? 120 : 150, B = 30;
-    const H = T + pH * 2 + gapY + B;
-    const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Line charts: CPU temperature and average clock speed over one full run" });
+    const L = narrow ? 42 : 52, R = 12, T0 = 22, gapY = 26, pH = narrow ? 120 : 150, B = 30;
+    const panels = [];
+    if (temps.length) {
+      const tempD = [Math.min(40, Math.floor((Math.min(...temps) - 5) / 20) * 20), Math.max(105, Math.max(...temps) + 5)];
+      panels.push({ key: "cpu_temp", d: tempD, ticks: [20, 40, 60, 80, 100].filter((v) => v >= tempD[0] && v <= tempD[1]), fmt: (v) => `${v}°`, label: "CPU °C" });
+    }
+    const mhzTop = Math.max(...mhz) * 1.08;
+    panels.push({ key: "cpu_mhz", d: [0, mhzTop], ticks: niceTicks(mhzTop / 1000 * 0.95, 4).map((v) => v * 1000).filter((v) => v > 0), fmt: (v) => `${v / 1000}`, label: "GHz, avg" });
+    panels.forEach((p, i) => { p.y0 = T0 + i * (pH + gapY); });
+    const spanH = panels.length * pH + (panels.length - 1) * gapY;
+    const H = T0 + spanH + B;
+    const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": `Line chart${panels.length > 1 ? "s" : ""}: ${temps.length ? "CPU temperature and " : ""}average clock speed over one full run` });
     const tMax = s.t[s.t.length - 1];
     const x = scale("linear", 0, tMax, L, W - R);
     const PH = { cpp: "C++", python: "Python", r: "R", js: "JavaScript" };
@@ -728,19 +912,12 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
         const name = PH[s.phase[i0]];
         if (name) {
           const x0 = x(s.t[i0]), x1 = x(s.t[i - 1]);
-          for (const py of [T, T + pH + gapY]) svgEl("rect", { x: x0, y: py, width: Math.max(1, x1 - x0), height: pH, style: `fill:${col(name)}`, opacity: 0.12 }, svg);
-          if (x1 - x0 > 30) text(svg, (x0 + x1) / 2, T - 8, name, "phase-label", { "text-anchor": "middle" });
+          for (const p of panels) svgEl("rect", { x: x0, y: p.y0, width: Math.max(1, x1 - x0), height: pH, style: `fill:${col(name)}`, opacity: 0.12 }, svg);
+          if (x1 - x0 > 30) text(svg, (x0 + x1) / 2, T0 - 8, name, "phase-label", { "text-anchor": "middle" });
         }
         i0 = i;
       }
     }
-    const temps = s.cpu_temp.filter((v) => v != null), mhz = s.cpu_mhz.filter((v) => v != null);
-    const tempD = [Math.min(40, Math.floor((Math.min(...temps) - 5) / 20) * 20), Math.max(105, Math.max(...temps) + 5)];
-    const mhzTop = Math.max(...mhz) * 1.08;
-    const panels = [
-      { key: "cpu_temp", y0: T, d: tempD, ticks: [20, 40, 60, 80, 100].filter((v) => v >= tempD[0] && v <= tempD[1]), fmt: (v) => `${v}°`, label: "CPU °C" },
-      { key: "cpu_mhz", y0: T + pH + gapY, d: [0, mhzTop], ticks: niceTicks(mhzTop / 1000 * 0.95, 4).map((v) => v * 1000).filter((v) => v > 0), fmt: (v) => `${v / 1000}`, label: "GHz, avg" },
-    ];
     for (const p of panels) {
       const y = scale("linear", p.d[0], p.d[1], p.y0 + pH, p.y0);
       for (const t of p.ticks) {
@@ -748,12 +925,13 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
         text(svg, L - 6, y(t) + 4, p.fmt(t), "tick axis-label", { "text-anchor": "end" });
       }
       text(svg, L + 4, p.y0 + 12, p.label, "axis-label");
-      svgEl("polyline", { points: s.t.map((t, i) => `${x(t).toFixed(1)},${y(s[p.key][i]).toFixed(1)}`).join(" "), fill: "none", stroke: "var(--ink-2)", "stroke-width": 1.5, "stroke-linejoin": "round" }, svg);
-      p.y = y;
+      const pts = s.t.map((t, i) => s[p.key][i] == null ? null : `${x(t).toFixed(1)},${y(s[p.key][i]).toFixed(1)}`).filter(Boolean);
+      svgEl("polyline", { points: pts.join(" "), fill: "none", stroke: "var(--ink-2)", "stroke-width": 1.5, "stroke-linejoin": "round" }, svg);
     }
-    for (let t = 0; t <= tMax; t += 60) text(svg, x(t), H - B + 18, `${t / 60} min`, "tick axis-label", { "text-anchor": "middle" });
-    const cross = svgEl("line", { x1: 0, x2: 0, y1: T, y2: T + pH * 2 + gapY, class: "crosshair", visibility: "hidden" }, svg);
-    const hit = svgEl("rect", { x: L, y: T, width: W - R - L, height: pH * 2 + gapY, style: "fill:transparent" }, svg);
+    const step = tMax > 900 ? 120 : 60;
+    for (let t = 0; t <= tMax; t += step) text(svg, x(t), H - B + 18, `${t / 60} min`, "tick axis-label", { "text-anchor": "middle" });
+    const cross = svgEl("line", { x1: 0, x2: 0, y1: T0, y2: T0 + spanH, class: "crosshair", visibility: "hidden" }, svg);
+    const hit = svgEl("rect", { x: L, y: T0, width: W - R - L, height: spanH, style: "fill:transparent" }, svg);
     let idx = 0;
     const build = (e) => {
       if (e) {
@@ -764,9 +942,12 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
       }
       cross.setAttribute("x1", x(s.t[idx])); cross.setAttribute("x2", x(s.t[idx])); cross.setAttribute("visibility", "visible");
       const who = PH[s.phase[idx]] || "between languages";
+      const rows = [];
+      if (temps.length) rows.push({ value: `${nf3.format(s.cpu_temp[idx])} °C`, label: "CPU temperature" });
+      rows.push({ value: `${(s.cpu_mhz[idx] / 1000).toFixed(2)} GHz`, label: "CPU clock, average" },
+                { value: `${s.gpu_busy[idx]}%`, label: "GPU busy" }, { value: `${nf3.format(s.ram[idx])} GiB`, label: "RAM in use" });
       return { title: `${Math.floor(s.t[idx] / 60)}:${String(Math.round(s.t[idx] % 60)).padStart(2, "0")} · ${who}`,
-        rows: [{ value: `${nf3.format(s.cpu_temp[idx])} °C`, label: "CPU temperature" }, { value: `${(s.cpu_mhz[idx] / 1000).toFixed(2)} GHz`, label: "CPU clock, average" },
-               { value: `${s.gpu_busy[idx]}%`, label: "GPU busy" }, { value: `${nf3.format(s.ram[idx])} GiB`, label: "RAM in use" }].map((r) => ({ ...r, color: PH[s.phase[idx]] ? col(PH[s.phase[idx]]) : "var(--ink-2)" })) };
+        rows: rows.map((r) => ({ ...r, color: PH[s.phase[idx]] ? col(PH[s.phase[idx]]) : "var(--ink-2)" })) };
     };
     bindTip(hit, build);
     hit.addEventListener("pointerleave", () => cross.setAttribute("visibility", "hidden"));
@@ -782,7 +963,31 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
     box.replaceChildren(svg);
   }
 
-  renderAll();
+  // ---------------------------------------------------------------- machine switcher
+  const seg = document.getElementById("seg");
+  for (const m of ALL.machines) {
+    const b = el("button", null, m.T.switch_label);
+    b.type = "button"; b.dataset.id = m.id;
+    b.addEventListener("click", () => select(m.id, true));
+    seg.appendChild(b);
+  }
+  function select(id, fromUser) {
+    const m = BY_ID[id] || BY_ID[ALL.default];
+    D = m; LANGS = m.langs; S = m.system; T = m.T;
+    for (const b of seg.children) b.setAttribute("aria-pressed", String(b.dataset.id === m.id));
+    fillText();
+    renderMachine();
+    if (fromUser) {
+      history.replaceState(null, "", `#${m.id}`);
+      // when the switcher is stuck to the top, jump to the start of the newly shown machine
+      if (document.querySelector(".switcher").getBoundingClientRect().top <= 0) document.getElementById("view").scrollIntoView({ block: "start" });
+    }
+  }
+  function renderAll() { renderCompare(); renderMachine(); }
+
+  select(location.hash.slice(1) in BY_ID ? location.hash.slice(1) : ALL.default, false);
+  renderCompare();
+  window.addEventListener("hashchange", () => { if (location.hash.slice(1) in BY_ID) select(location.hash.slice(1), false); });
   let pending = null, lastW = document.querySelector(".page").clientWidth;
   new ResizeObserver(() => {
     const w = document.querySelector(".page").clientWidth;
