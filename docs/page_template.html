@@ -189,6 +189,14 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
     </div>
   </header>
 
+  <section aria-labelledby="h-read">
+    <div class="section-head">
+      <h2 id="h-read">Read the results by workload</h2>
+      <p>Start with the operation your application spends time on. The same language can approach C++ on a library call and fall far behind on a plain loop. Matrix multiplication depends on the installed BLAS; GPU work depends on both kernel execution and data movement.</p>
+    </div>
+    <p class="note">These are throughput ratios for the recorded implementations and machines. Overall weights CPU single-core, CPU multicore, RAM and GPU equally; it does not predict application runtime, energy use or value for money. Flagged GPU compute results remain visible, with their effect on the score quantified in the GPU section.</p>
+  </section>
+
   <!-- optional:compare -->
   <section aria-labelledby="h-compare">
     <div class="section-head">
@@ -245,7 +253,7 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
     <section aria-labelledby="h-overall">
       <div class="section-head">
         <h2 id="h-overall">Overall speed, relative to C++</h2>
-        <p>Each test's best rate divided by C++'s rate on the same test and machine, averaged geometrically within each hardware area, then across the four areas. 1× is as fast as C++.</p>
+        <p>For each test, take the highest median rate across its measured sizes and worker counts, then divide by C++'s selected rate. Category scores are geometric means of these ratios; Overall is the geometric mean of the available categories. 1× is C++ throughput; 0.5× is half that throughput. Missing tests are omitted.</p>
       </div>
       <div class="scores" id="scores"></div>
       <figure>
@@ -258,7 +266,7 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
     <section aria-labelledby="h-tests">
       <div class="section-head">
         <h2 id="h-tests">Every test</h2>
-        <p>Speed relative to C++ on a log scale, so 0.01× and 10× fit on one axis. Hover a row for the measured rates and the spread across <span data-t="runs_text"></span>. Plain loops are where Python and R fall furthest behind; library calls are where they catch up.</p>
+        <p>Speed relative to C++ on a log scale, so 0.01× and 10× fit on one axis. Hover or focus a row for measured rates and observed ranges across <span data-t="runs_text"></span>. Ranges may include different numbers of runs per test. They are descriptive, not confidence intervals.</p>
       </div>
       <figure>
         <figcaption><span class="t">Speed relative to C++, per test</span><div class="legend" id="lg-tests"></div></figcaption>
@@ -271,6 +279,7 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
       <div class="section-head">
         <h2 id="h-cores">Using all cores</h2>
         <p data-t="cores_text"></p>
+        <p class="note">Speedup uses each language's own one-worker result. It measures scaling, not absolute throughput. Hybrid cores, SMT, scheduling and task overhead make the ideal worker-count line a reference rather than an expected result.</p>
       </div>
       <figure>
         <figcaption><span class="t">Speedup over one worker</span><div class="legend" id="lg-par"></div></figcaption>
@@ -300,7 +309,7 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
         <figure>
           <figcaption><span class="t">Random reads from a 2 GiB array</span></figcaption>
           <div class="chart" id="ch-gather"></div>
-          <p class="note">Nanoseconds per read; lower is better. Each read is a likely cache miss, so this mostly measures memory latency plus each language's per-element overhead.</p>
+          <p class="note">Total elapsed time divided by the number of indexed reads; lower is better. This includes index handling, memory access and reduction, with different temporary arrays and opportunities for overlapping reads. It is not a direct measurement of DRAM latency.</p>
         </figure>
       </div>
     </section>
@@ -312,11 +321,17 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
       </div>
       <div class="legend" id="lg-gpu"></div>
       <div class="grid-2" id="gpu-grid"></div>
+      <figure>
+        <figcaption><span class="t">GPU kernels, transfers and score sensitivity</span></figcaption>
+        <p class="note" id="scope-note"></p>
+        <div class="table-wrap" id="tb-scope"></div>
+        <p class="note">Each cell is a geometric mean relative to C++ on this machine. Resident-buffer tests exclude initial input upload, but include launch and wait costs. Transfer tests include API handling and conversions. Adding these ratios cannot estimate pipeline runtime.</p>
+      </figure>
     </section>
 
     <section aria-labelledby="h-peak">
       <div class="section-head">
-        <h2 id="h-peak">How much of the hardware each language reaches</h2>
+        <h2 id="h-peak">Measured throughput against estimated peaks</h2>
         <p data-t="peak_text"></p>
       </div>
       <figure>
@@ -338,7 +353,7 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
     </section>
 
     <section aria-labelledby="h-find">
-      <div class="section-head"><h2 id="h-find">What the numbers say</h2></div>
+      <div class="section-head"><h2 id="h-find">Findings and their limits</h2></div>
       <ul class="findings" id="findings"></ul>
     </section>
   </div>
@@ -346,8 +361,11 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
   <section aria-labelledby="h-method">
     <div class="section-head"><h2 id="h-method">How it was measured</h2></div>
     <div class="method">
-      <p>Each language implements the same specification: the same algorithms, the same inputs (generated from one formula, not each language's random generator) and the same output format. Loop-heavy tests use smaller sizes in Python and R, and every result is a rate (work per second), so sizes don't affect the comparison. Each test runs five times after a warm-up; the median counts. The figures above come from the newest full run of each language; the run-to-run spread is in the tooltips (on the <span data-t="machine_name"></span>, <span data-t="spread_text"></span>).</p>
+      <p>Each implementation follows the same test definitions and deterministic input formulas. Some performance sizes differ by language. Reporting work per second makes the units comparable, but does not remove size-dependent cache, algorithm or startup effects. Built-in operations use language-specific implementations; matching outputs does not imply matching machine instructions.</p>
+      <p>Most tests have five timed repetitions after a warm-up. Parallel Mandelbrot and allocation have one measurement per configuration. The charts use the newest full-mode run of each language, which can come from different batches. Each headline test rate is the maximum of the configuration medians; C++'s triad may use multiple threads while the others use one. Tooltips show earlier full-mode ranges (on the <span data-t="machine_name"></span>, <span data-t="spread_text"></span>).</p>
       <p><span data-t="cool_text"></span> <span data-t="power_text"></span> <span data-t="verify_text"></span> <span data-t="minutes_text"></span></p>
+      <p>The runs describe these machines under their recorded conditions. Hardware, operating system and software versions change together, and run order is not randomized. A temperature rise or a score gap alone does not identify a cause. To test a proposed explanation, repeat with matched sizes, worker counts and library settings while varying one factor at a time.</p>
+      <p>Allocation measures first use as well as allocation itself. <a href="https://numpy.org/doc/stable/reference/global_state.html#madvise-hugepage-on-linux">NumPy documents Linux huge-page advice</a>, which is a plausible contributor to the Dell result; a controlled run with that advice disabled is needed to estimate its effect here.</p>
       <p>To add a machine, clone the repository and run, on Linux:</p>
       <pre>./run_all.sh --check     # what is installed, per language
 ./run_all.sh             # full run; results go to results/&lt;machine&gt;/</pre>
@@ -937,6 +955,7 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
       const cap = el("figcaption"); cap.appendChild(el("span", "t", `${DESC[t.test]} (${t.unit})`));
       const pk = peakOf(t);
       if (pk) cap.appendChild(el("span", "note", `line: peak ${nf0.format(pk)}`));
+      if (D.scope.excluded.includes(t.test)) cap.appendChild(el("span", "note", "JavaScript: flagged work count; see sensitivity table"));
       const ch = el("div", "chart"); ch.id = `ch-${t.test}`;
       f.append(cap, ch); grid.appendChild(f);
     }
@@ -955,6 +974,22 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
           note: [rangeNote(t, r.lang), peak ? `${Math.round(100 * t.rate[r.lang] / peak)}% of peak` : ""].filter(Boolean).join(" · ") }),
       });
     }
+
+    const sc = D.scope;
+    document.getElementById("scope-note").textContent = sc.excluded.length
+      ? `Sensitivity analysis: omit ${sc.excluded.join(", ")} from every language on this machine. The resident-buffer row below uses the remaining ${sc.resident_tests.length} tests; original charts and headline scores retain all measured rows.`
+      : `Separate the ${sc.resident_tests.length} resident-buffer GPU tests from the ${sc.transfer_tests.length} transfer tests. No GPU compute test is flagged on this machine.`;
+    const scopeRows = [
+      ["GPU, all recorded tests", D.categories.gpu || {}],
+      [`Resident-buffer tests (${sc.resident_tests.length})`, sc.resident],
+      [`Upload / download (${sc.transfer_tests.length})`, sc.transfer],
+    ];
+    if (sc.excluded.length) scopeRows.push(
+      ["GPU, flagged test excluded", sc.gpu],
+      ["Overall, all recorded tests", D.overall],
+      ["Overall, flagged test excluded", sc.overall],
+    );
+    table("tb-scope", ["Scope", ...LANGS], scopeRows.map(([name, scores]) => [name, ...LANGS.map((l) => times(scores[l]))]));
 
     // share of peak
     legend("lg-util", LANGS);
