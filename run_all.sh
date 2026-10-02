@@ -59,10 +59,18 @@ OUT="${OUT:-$ROOT/results/$BENCH_MACHINE}"
 PYTHON="${BENCH_PYTHON:-$(command -v python3 || true)}"
 export RUSTICL_ENABLE="${RUSTICL_ENABLE:-radeonsi,iris}"   # let Mesa's rusticl expose AMD and Intel GPUs
 
-# Node.js may come from nvm, which is only on PATH in interactive shells.
+# Node.js 20 or newer: the one on PATH if it is new enough, else the newest from nvm (which is only on PATH in
+# interactive shells; distributions often ship an older node in /usr/bin).
 find_node() {
-  command -v node 2>/dev/null && return
-  ls -d "$HOME"/.nvm/versions/node/*/bin/node 2>/dev/null | sort -V | tail -1
+  local n v best=""
+  for n in "$(command -v node 2>/dev/null)" $(ls -d "$HOME"/.nvm/versions/node/*/bin/node 2>/dev/null | sort -V); do
+    [[ -x "$n" ]] || continue
+    v="$("$n" -p 'process.versions.node.split(".")[0]' 2>/dev/null)"
+    (( ${v:-0} >= 20 )) || continue
+    [[ -z "$best" || "$n" != "$(command -v node 2>/dev/null)" ]] && best="$n"
+    [[ "$n" == "$(command -v node 2>/dev/null)" ]] && break
+  done
+  [[ -n "$best" ]] && echo "$best"
 }
 
 OPENBLAS_CANDIDATES=(/usr/lib/x86_64-linux-gnu/openblas-pthread/libopenblas.so.0
@@ -81,6 +89,7 @@ hwmon_by_name() {
       [[ "$(read1 "$h/name")" == "$want" ]] && { echo "$h"; return; }
     done
   done
+  return 0   # no such sensor: empty, not an error (set -e would end the script)
 }
 CPU_HWMON="$(hwmon_by_name k10temp zenpower coretemp cpu_thermal)"
 GPU_HWMON="$(hwmon_by_name amdgpu)"
@@ -98,9 +107,9 @@ if (( CHECK )); then
                      ok "OpenCL headers (CL/cl.h)" "$( [[ -f /usr/include/CL/cl.h ]] && echo yes || echo 'NO - install opencl-headers ocl-icd-opencl-dev')"
   echo "Python";     ok "interpreter" "${PYTHON:-NOT FOUND} $([[ -n "$PYTHON" ]] && "$PYTHON" -c 'import sys; print(sys.version.split()[0])' 2>/dev/null)"
                      for m in numpy pyopencl pandas matplotlib jupyterlab; do ok "  $m" "$([[ -n "$PYTHON" ]] && have "$PYTHON" -c "import $m" || echo NO)"; done
-  echo "R";          ok "Rscript" "$(Rscript --version 2>&1 | head -1 || echo 'NOT FOUND (install r-base)')"
+  echo "R";          ok "Rscript" "$(command -v Rscript >/dev/null && Rscript --version 2>&1 | head -1 || echo 'NOT FOUND (install r-base)')"
                      ok "  OpenCL package" "$(have Rscript -e 'stopifnot(requireNamespace("OpenCL", quietly = TRUE))')"
-  echo "JavaScript"; NODE="$(find_node || true)"; ok "node" "${NODE:-NOT FOUND (install Node.js, e.g. with nvm)} $([[ -n "$NODE" ]] && "$NODE" --version)"
+  echo "JavaScript"; NODE="$(find_node || true)"; ok "node" "${NODE:-NOT FOUND (install Node.js 20 or newer, e.g. with nvm)} $([[ -n "$NODE" ]] && "$NODE" --version)"
                      for m in webgpu koffi; do ok "  npm $m" "$([[ -d "$ROOT/JavaScript/node_modules/$m" ]] && echo yes || echo 'NO - run npm install in JavaScript/')"; done
   echo "GPU";        ok "OpenCL devices" "$(command -v clinfo >/dev/null && clinfo -l 2>/dev/null | sed -n 's/.*Device #[0-9]*: //p' | paste -sd ';' || echo 'clinfo not installed')"
   echo "Sensors";    ok "CPU temperature" "${CPU_HWMON:-none found}"
@@ -114,12 +123,25 @@ ARGS=(--out "$OUT")
 [[ -n "$MODE_ARG" ]] && ARGS+=("$MODE_ARG")
 [[ -n "$ONLY" ]] && ARGS+=(--only "$ONLY")
 
+# --------------------------------------------------------------------------- build
+# The C++ program and hw_probe (hardware facts for the snapshot below) are built first.
+echo "Batch $BENCH_BATCH   machine: $BENCH_MACHINE   mode: ${MODE_ARG:---full}   languages: $LANGS"
+echo "Results: $OUT"
+echo "Python:  ${PYTHON/#$HOME/\~}"
+echo "Building C++..."
+make -s -C "$ROOT/Cpp" || echo "C++ build failed"
+
 # --------------------------------------------------------------------------- system snapshot
-# Everything the notebook needs to describe this machine and compute its theoretical peaks.
+# Everything the notebook needs to describe this machine and compute its theoretical peaks. Cpp/hw_probe adds
+# what the kernel does not report: per-type core counts and clocks of a hybrid CPU (measured on one busy core
+# of each type) and an NVIDIA GPU's memory bus (from the CUDA driver).
 write_system() {
-  local f="$OUT/system_${BENCH_BATCH}.csv" udev="" k
+  local f="$OUT/system_${BENCH_BATCH}.csv" udev="" k probe="" rated
   command -v udevadm >/dev/null && udev="$(udevadm info -p /sys/devices/virtual/dmi/id 2>/dev/null || true)"
   udev_val() { sed -n "s/^E: $1=//p" <<< "$udev" | head -1; }
+  [[ -x "$ROOT/Cpp/hw_probe" ]] && { echo "Measuring CPU clocks (hw_probe)..."; probe="$("$ROOT/Cpp/hw_probe" 2>/dev/null || true)"; }
+  probe_val() { sed -n "s/^$1=//p" <<< "$probe" | head -1; }
+  rated="$(awk '{printf "%.0f", $1/1000}' /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq 2>/dev/null || true)"
   kv() { local v="${2//\"/\"\"}"; printf '%s,"%s"\n' "$1" "${v//$HOME/\~}"; }
   {
     echo "key,value"
@@ -130,7 +152,9 @@ write_system() {
     kv chassis "$(case "$(read1 /sys/class/dmi/id/chassis_type)" in 8|9|10|14|30|31|32) echo laptop ;; 3|4|5|6|7|13|15|16|35|36) echo desktop ;; 17|23|28|29) echo server ;; *) echo "" ;; esac)"
     kv os "$(. /etc/os-release 2>/dev/null; echo "${PRETTY_NAME:-Linux}")"; kv kernel "$(uname -r)"; kv arch "$(uname -m)"
     kv cpu "$(sed -n 's/^model name[[:space:]]*: //p' /proc/cpuinfo | head -1)"
-    kv cpu_max_mhz "$(awk '{printf "%.0f", $1/1000}' /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq 2>/dev/null)"
+    kv cpu_max_mhz "${rated:-$(probe_val cpu_max_mhz)}"
+    kv cpu_max_mhz_source "$( [[ -n "$rated" ]] && echo cpufreq || { [[ -n "$(probe_val cpu_max_mhz)" ]] && echo 'measured by hw_probe on one busy core'; } )"
+    for k in cpu_e_max_mhz performance_cores efficiency_cores; do if [[ -n "$(probe_val $k)" ]]; then kv $k "$(probe_val $k)"; fi; done
     kv physical_cores "$(awk -F: '/^physical id/{p=$2} /^core id/{print p "-" $2}' /proc/cpuinfo | sort -u | wc -l)"
     kv logical_cpus "$(nproc)"
     kv smt "$(read1 /sys/devices/system/cpu/smt/active)"
@@ -143,6 +167,9 @@ write_system() {
     kv ram_module_sizes_gib "$(sed -n 's/^E: MEMORY_DEVICE_[0-9]*_SIZE=//p' <<< "$udev" | awk '{printf "%s%g", sep, $1/2^30; sep=" "}')"
     kv gpus "$(lspci 2>/dev/null | grep -iE 'vga|3d controller|display' | sed -E 's/^[^ ]+ [^:]+: //' | paste -sd ';')"
     kv opencl_devices "$(command -v clinfo >/dev/null && clinfo -l 2>/dev/null | sed -n 's/.*Device #[0-9]*: //p' | paste -sd ';')"
+    for k in gpu_cuda_name gpu_sm_count gpu_boost_clock_mhz gpu_memory_clock_mhz gpu_memory_bus_bits gpu_memory_gbs; do
+      if [[ -n "$(probe_val $k)" ]]; then kv $k "$(probe_val $k)"; fi
+    done
     kv power "$(for p in /sys/class/power_supply/*/online; do [[ "$(read1 "$p")" == 1 ]] && { echo AC; break; }; done | grep . || echo battery)"
     kv platform_profile "$(read1 /sys/firmware/acpi/platform_profile)"
     kv governor "$(read1 /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)"
@@ -195,12 +222,6 @@ cool_down() {
 }
 
 # --------------------------------------------------------------------------- run
-echo "Batch $BENCH_BATCH   machine: $BENCH_MACHINE   mode: ${MODE_ARG:---full}   languages: $LANGS"
-echo "Results: $OUT"
-echo "Python:  ${PYTHON/#$HOME/\~}"
-echo "Building C++..."
-make -s -C "$ROOT/Cpp"
-
 FAILED=()
 IFS=',' read -ra LANG_LIST <<< "$LANGS"
 for lang in "${LANG_LIST[@]}"; do
@@ -222,6 +243,9 @@ for lang in "${LANG_LIST[@]}"; do
 done
 
 sleep 2   # one more idle sensor sample
+# The highest GPU clock the sensor log saw (a GPU can boost above the clock the driver reports).
+gpu_max="$(awk -F, 'NR > 1 && $8 ~ /^[0-9]+$/ && $8 > m {m = $8} END {if (m) print m}' "$SENSORS")"
+if [[ -n "$gpu_max" ]]; then echo "gpu_clock_max_logged_mhz,\"$gpu_max\"" >> "$OUT/system_${BENCH_BATCH}.csv"; fi
 echo
 echo "System:  $OUT/system_${BENCH_BATCH}.csv"
 echo "Sensors: $SENSORS"

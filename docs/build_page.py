@@ -12,9 +12,9 @@ Usage
 The page has a section comparing the machines and, below it, a machine switcher that shows one machine at a
 time: the newest full-mode run of each language, the spread across all full runs, the sensor log of the newest
 full run, and - if the machine's folder holds a verify run - whether all languages computed identical answers.
-Text, chart ranges, theoretical peaks and findings are all computed from the results. Spec-sheet values that an
-operating system does not report (e.g. a CPU's boost clock on Windows) can be given per machine in
-results/<machine>/hardware.csv (key,value,source). Template: docs/page_template.html. Needs numpy and pandas.
+Text, chart ranges, theoretical peaks and findings are all computed from the results, including the hardware facts
+the runners record (measured CPU clocks, GPU memory bus from the CUDA driver, the highest GPU clock logged).
+Values can be overridden per machine in an optional, hand-written results/<machine>/hardware.csv (key,value,source). Template: docs/page_template.html. Needs numpy and pandas.
 """
 
 import argparse
@@ -154,7 +154,10 @@ def machine_peaks(system, metas):
     gpu = ocl[0] if ocl else {}
     name = gpu.get("gpu_device", "")
     lanes = 128 if re.search(r"nvidia|geforce|rtx|quadro", name, re.I) else 8 if re.search(r"intel|iris|uhd|arc", name, re.I) else 64
-    cus, mhz = fnum(gpu.get("gpu_compute_units")), fnum(gpu.get("gpu_max_clock_mhz"))
+    cus = fnum(gpu.get("gpu_compute_units"))
+    # The GPU may boost above the clock its driver reports: the highest clock the sensor log saw counts if higher.
+    mhz = max((v for v in (fnum(gpu.get("gpu_max_clock_mhz")), fnum(system.get("gpu_clock_max_logged_mhz")),
+                           fnum(system.get("gpu_max_clock_mhz"))) if np.isfinite(v)), default=float("nan"))
     discrete = bool(re.search(DISCRETE_GPU, name, re.I))
     gpu_mem = fnum(system.get("gpu_memory_gbs")) if discrete else ram_peak   # an integrated GPU uses system RAM
     rnd = lambda v, d=1: round(v, d) if np.isfinite(v) else None
@@ -218,7 +221,12 @@ def build(folder):
     run_meta = {l: next(m for rid, m in metas.items() if m.get("language") == l and m.get("batch") == newest[l] and m.get("mode") == "full")
                 for l in langs}
     system = dict(next((s for s in reversed(systems) if s.get("batch") in set(newest.values())), systems[-1] if systems else {}))
-    system.update({k: v for k, v in hardware.items() if v != ""})        # spec-sheet values from hardware.csv
+    # Measured clocks depend on the load at that moment: use the highest any snapshot of this machine recorded.
+    for k in ("cpu_max_mhz", "cpu_e_max_mhz", "gpu_clock_max_logged_mhz"):
+        best = max((fnum(s.get(k)) for s in systems if np.isfinite(fnum(s.get(k)))), default=None)
+        if best is not None:
+            system[k] = f"{best:.0f}"
+    system.update({k: v for k, v in hardware.items() if v != ""})        # optional hand-written hardware.csv wins
     peaks, hw = machine_peaks(system, list(run_meta.values()))
 
     def best_of(ts, l):
@@ -424,8 +432,8 @@ def texts(D):
         items.append((None, f"<b>The hardware sets the ceiling:</b> {'; '.join(ceil)}, about the same from every language"
                             + (" that uses OpenBLAS." if windows and mm and mm["rate"].get("R") and "rblas" in
                                D["_meta"].get("R", {}).get("blas", "").lower() else ".")))
-    T["findings"] = "\n".join(f'<li{" style=\"--k: var(--c-%s)\"" % CSS_KEY[l] if l else ""}><span>{body}</span></li>'
-                              for l, body in items)
+    key = lambda l: ' style="--k: var(--c-%s)"' % CSS_KEY[l] if l else ""
+    T["findings"] = "\n".join(f"<li{key(l)}><span>{body}</span></li>" for l, body in items)
     return T
 
 

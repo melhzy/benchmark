@@ -9,6 +9,8 @@ __pycache__/
 # C++ build output
 Cpp/common_benchmark
 Cpp/common_benchmark.exe
+Cpp/hw_probe
+Cpp/hw_probe.exe
 Cpp/*.dll
 Cpp/.build-*
 

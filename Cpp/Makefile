@@ -1,5 +1,5 @@
 # Builds the C++ implementation of the common benchmark (see ../common/SPEC.md).
-#   make                               build ./common_benchmark (Windows: common_benchmark.exe)
+#   make                               build ./common_benchmark and ./hw_probe (Windows: .exe)
 #   make OPENBLAS=/path/to/libopenblas.so.0   use a specific OpenBLAS library
 #   make clean                         remove it
 #
@@ -42,6 +42,8 @@ else
   CL_HEADER := $(wildcard /usr/include/CL/cl.h)
 endif
 TARGET := common_benchmark$(EXE)
+PROBE  := hw_probe$(EXE)
+PROBE_LIBS := $(if $(EXE),,-ldl)
 
 ifeq ($(origin OPENBLAS),undefined)
   ifneq ($(BENCH_OPENBLAS),)
@@ -85,10 +87,14 @@ ifneq ($(CONFIG),$(OLD_CONFIG))
   $(shell rm -f .build-gpu-*; echo '$(CONFIG)' > .build-config)
 endif
 
-all: $(TARGET) $(EXTRA)
+all: $(TARGET) $(PROBE) $(EXTRA)
 
 $(TARGET): common_benchmark.cpp Makefile .build-config
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ $< $(LDLIBS)
+
+# hw_probe: hardware facts for the runners' system snapshot (measured CPU clock, NVIDIA GPU memory; see hw_probe.cpp)
+$(PROBE): hw_probe.cpp Makefile
+	$(CXX) -O2 -std=c++20 -o $@ $< $(PROBE_LIBS)
 
 # Windows: the OpenBLAS DLL next to the program (Windows looks for DLLs in the program's folder).
 ifneq ($(EXTRA),)
@@ -97,6 +103,6 @@ $(EXTRA): $(OPENBLAS) .build-config
 endif
 
 clean:
-	rm -f common_benchmark common_benchmark.exe *.dll .build-config .build-gpu-*
+	rm -f common_benchmark common_benchmark.exe hw_probe hw_probe.exe *.dll .build-config .build-gpu-*
 
 .PHONY: all clean

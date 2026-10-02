@@ -695,7 +695,7 @@ class Runner:
             ("CPU", f"{cpu_model() or '?'}, "
                     f"{physical_cores()} physical / {os.cpu_count()} logical"),
             ("GPU", gpu_text),
-            ("Power", f"{power_source()}, profile {platform_profile()}"),
+            ("Power", f"{power_source()}, profile {platform_profile() or '-'}"),
             ("CPU temp", f"{self.temp_start:.0f} C" if self.temp_start is not None else "?"),
             ("Mode", self.mode),
             ("Output", tilde(self.csv_path)),

@@ -393,8 +393,10 @@ class Gpu {
     let mod;
     try {
       mod = await import('webgpu');
-    } catch {
-      throw new Error("npm package 'webgpu' is not installed (run npm install in JavaScript/)");
+    } catch (e) {
+      const missing = e.code === 'ERR_MODULE_NOT_FOUND' && /'webgpu'/.test(e.message);
+      throw new Error(missing ? "npm package 'webgpu' is not installed (run npm install in JavaScript/)"
+        : `npm package 'webgpu' cannot load: ${e.message}`);
     }
     Object.assign(globalThis, mod.globals);
     const gpu = mod.create([]);

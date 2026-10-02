@@ -111,40 +111,38 @@ $ProgArgs = @('--out', $Out)
 if ($ModeArg) { $ProgArgs += $ModeArg }
 if ($Only) { $ProgArgs += @('--only', $Only) }
 
+# ------------------------------------------------------------------------------------------------- build
+# The C++ program and hw_probe (hardware facts for the snapshot below) are built first.
+Write-Host "Batch $Batch   machine: $Machine   mode: $(if ($ModeArg) { $ModeArg } else { '--full' })   languages: $Langs"
+Write-Host "Results: $Out"
+Write-Host "Python:  $(if ($Python) { $Python.Replace($env:USERPROFILE, '~') } else { 'not found' })"
+if ($Toolchain) {
+  Write-Host 'Building C++...'
+  $savedPath = $env:PATH
+  $env:PATH = (($Toolchain.Path + $env:PATH.Split(';')) -join ';')
+  # (the Makefile looks in deps\ itself; pass other locations on)
+  if ($OpenClSdk -and $OpenClSdk -ne (Join-Path $DepsDir 'opencl-sdk')) { $env:BENCH_OPENCL_SDK = $OpenClSdk }
+  & $Toolchain.Make -s -C (Join-Path $Root 'Cpp')
+  if ($LASTEXITCODE -ne 0) { Write-Host 'C++ build failed' }
+  $env:PATH = $savedPath
+} elseif (Test-Path $CppExe) {
+  Write-Host 'No g++/make found - using the existing Cpp\common_benchmark.exe'
+}
+
 # ------------------------------------------------------------------------------------------------- system snapshot
 # Everything the notebook and the results page need to describe this machine and compute its theoretical peaks;
-# the same keys as run_all.sh where Windows has the information.
-Add-Type -TypeDefinition @'
-using System;
-using System.Runtime.InteropServices;
-public static class BenchCpu {
-  [DllImport("kernel32.dll")] static extern bool GetLogicalProcessorInformationEx(int relation, IntPtr buffer, ref uint length);
-  [DllImport("kernel32.dll")] public static extern bool IsProcessorFeaturePresent(int feature);
-  // Number of physical cores per efficiency class (index 0 = lowest class). Hybrid Intel CPUs have
-  // two classes: efficiency (E) cores and performance (P) cores; other CPUs have one.
-  public static int[] CoresByClass() {
-    uint len = 0;
-    GetLogicalProcessorInformationEx(0, IntPtr.Zero, ref len);          // 0 = RelationProcessorCore
-    IntPtr p = Marshal.AllocHGlobal((int)len);
-    var counts = new int[256];
-    int top = 0;
-    try {
-      if (!GetLogicalProcessorInformationEx(0, p, ref len)) return new int[0];
-      byte[] b = new byte[len];
-      Marshal.Copy(p, b, 0, (int)len);
-      for (int off = 0; off < len; off += BitConverter.ToInt32(b, off + 4)) {
-        int cls = b[off + 9];                                             // PROCESSOR_RELATIONSHIP.EfficiencyClass
-        counts[cls]++;
-        top = Math.Max(top, cls);
-      }
-    } finally { Marshal.FreeHGlobal(p); }
-    var result = new int[top + 1];
-    Array.Copy(counts, result, top + 1);
-    return result;
+# the same keys as run_all.sh where Windows has the information. Cpp\hw_probe.exe measures the CPU's clock on one
+# busy core of each type (Windows does not report the boost clock) and reads an NVIDIA GPU's memory bus from the
+# CUDA driver.
+function Get-Probe {
+  $probe = Join-Path $Root 'Cpp\hw_probe.exe'
+  $h = @{}
+  if (Test-Path $probe) {
+    Write-Host 'Measuring CPU clocks (hw_probe)...'
+    foreach ($line in & $probe) { if ("$line" -match '^([a-z0-9_]+)=(.*)$') { $h[$Matches[1]] = $Matches[2] } }
   }
+  return $h
 }
-'@
-
 function Write-System {
   $f = Join-Path $Out "system_$Batch.csv"
   $home1 = $env:USERPROFILE
@@ -162,11 +160,8 @@ function Write-System {
   $bios = Get-ItemProperty 'HKLM:\HARDWARE\DESCRIPTION\System\BIOS' -ErrorAction SilentlyContinue
   $cur = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' -ErrorAction SilentlyContinue
   $chassis = @((Get-CimInstance Win32_SystemEnclosure).ChassisTypes)[0]
-  $classes = [BenchCpu]::CoresByClass()
+  $probe = Get-Probe
   $ramTypes = @{ 20 = 'DDR'; 21 = 'DDR2'; 24 = 'DDR3'; 26 = 'DDR4'; 27 = 'LPDDR'; 28 = 'LPDDR2'; 29 = 'LPDDR3'; 30 = 'LPDDR4'; 34 = 'DDR5'; 35 = 'LPDDR5' }
-  $flags = @(); foreach ($pair in @(@(38, 'sse4_2'), @(39, 'avx'), @(40, 'avx2'), @(41, 'avx512f'))) {
-    if ([BenchCpu]::IsProcessorFeaturePresent($pair[0])) { $flags += $pair[1] } }
-  if ($flags -contains 'avx2') { $flags += 'fma' }        # every x86 CPU with AVX2 also has FMA3 (Windows has no flag for it)
   Add-Type -AssemblyName System.Windows.Forms
   $line = [System.Windows.Forms.SystemInformation]::PowerStatus.PowerLineStatus
   $modes = @{ '961cc777-2547-4f9d-8174-7d86181b8a7a' = 'best power efficiency'; '00000000-0000-0000-0000-000000000000' = 'balanced'
@@ -189,13 +184,15 @@ function Write-System {
   Kv kernel "$($os.Version).$($cur.UBR)"
   Kv arch $(if ($env:PROCESSOR_ARCHITECTURE -eq 'AMD64') { 'x86_64' } elseif ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'aarch64' } else { $env:PROCESSOR_ARCHITECTURE })
   Kv cpu "$($cpu[0].Name)".Trim()
-  Kv cpu_max_mhz ''          # Windows does not report the maximum boost clock; see results\<machine>\hardware.csv
+  Kv cpu_max_mhz $probe['cpu_max_mhz']
+  Kv cpu_max_mhz_source $(if ($probe['cpu_max_mhz']) { 'measured by hw_probe on one busy core (Windows does not report the boost clock)' } else { '' })
+  if ($probe['cpu_e_max_mhz']) { Kv cpu_e_max_mhz $probe['cpu_e_max_mhz'] }
   Kv cpu_base_mhz $cpu[0].MaxClockSpeed
   Kv physical_cores (($cpu | Measure-Object -Property NumberOfCores -Sum).Sum)
   Kv logical_cpus $cs.NumberOfLogicalProcessors
-  if ($classes.Count -gt 1) { Kv performance_cores $classes[-1]; Kv efficiency_cores (($classes | Measure-Object -Sum).Sum - $classes[-1]) }
+  if ($probe['performance_cores']) { Kv performance_cores $probe['performance_cores']; Kv efficiency_cores $probe['efficiency_cores'] }
   Kv smt $(if ($cs.NumberOfLogicalProcessors -gt (($cpu | Measure-Object -Property NumberOfCores -Sum).Sum)) { 1 } else { 0 })
-  Kv cpu_flags ($flags -join ' ')
+  Kv cpu_flags $probe['cpu_flags']
   Kv l3_cache "$($cpu[0].L3CacheSize)K"
   Kv ram_gib ([string]::Format($Inv, '{0:F1}', $os.TotalVisibleMemorySize / 1MB))
   Kv ram_type $ramTypes[[int]$mem[0].SMBIOSMemoryType]
@@ -204,6 +201,8 @@ function Write-System {
   Kv ram_module_sizes_gib (($mem | ForEach-Object { [string]::Format($Inv, '{0:G}', [math]::Round($_.Capacity / 1GB, 1)) }) -join ' ')
   Kv gpus ((@(Get-CimInstance Win32_VideoController) | ForEach-Object { $_.Name }) -join ';')
   Kv opencl_devices (Get-OpenClDevices)
+  foreach ($k in 'gpu_cuda_name', 'gpu_sm_count', 'gpu_boost_clock_mhz', 'gpu_memory_clock_mhz', 'gpu_memory_bus_bits', 'gpu_memory_gbs') {
+    if ($probe[$k]) { Kv $k $probe[$k] } }
   Kv power $(if ("$line" -eq 'Offline') { 'battery' } else { 'AC' })
   Kv platform_profile $(if ($modes.ContainsKey($overlay)) { $modes[$overlay] } else { $overlay })
   Kv governor "Windows power plan: $plan"
@@ -256,22 +255,6 @@ function Set-Phase([string]$Name) { Set-Content -LiteralPath $PhaseFile -Value $
 # ------------------------------------------------------------------------------------------------- run
 $Failed = @()
 try {
-  Write-Host "Batch $Batch   machine: $Machine   mode: $(if ($ModeArg) { $ModeArg } else { '--full' })   languages: $Langs"
-  Write-Host "Results: $Out"
-  Write-Host "Python:  $(if ($Python) { $Python.Replace($env:USERPROFILE, '~') } else { 'not found' })"
-  if ($Toolchain) {
-    Write-Host 'Building C++...'
-    $savedPath = $env:PATH
-    $env:PATH = (($Toolchain.Path + $env:PATH.Split(';')) -join ';')
-    # (the Makefile looks in deps\ itself; pass other locations on)
-    if ($OpenClSdk -and $OpenClSdk -ne (Join-Path $DepsDir 'opencl-sdk')) { $env:BENCH_OPENCL_SDK = $OpenClSdk }
-    & $Toolchain.Make -s -C (Join-Path $Root 'Cpp')
-    if ($LASTEXITCODE -ne 0) { Write-Host 'C++ build failed' }
-    $env:PATH = $savedPath
-  } elseif (Test-Path $CppExe) {
-    Write-Host 'No g++/make found - using the existing Cpp\common_benchmark.exe'
-  }
-
   $first = $true
   foreach ($lang in ($Langs -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })) {
     switch ($lang) {
@@ -305,5 +288,9 @@ try {
 } finally {
   Stop-Sensors
 }
+# The highest GPU clock the sensor log saw (a GPU can boost above the clock the driver reports).
+$gpuMax = (Import-Csv $Sensors | Where-Object { $_.gpu_sclk_mhz -match '^\d+$' } | ForEach-Object { [int]$_.gpu_sclk_mhz } |
+           Measure-Object -Maximum).Maximum
+if ($gpuMax) { Add-Content -LiteralPath (Join-Path $Out "system_$Batch.csv") -Value "gpu_clock_max_logged_mhz,`"$gpuMax`"" -Encoding ascii }
 if ($Failed.Count) { Write-Host "Finished with errors in: $($Failed -join ' ')"; exit 1 }
 Write-Host 'Done. Open analysis.ipynb to explore the results.'

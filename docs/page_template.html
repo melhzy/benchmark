@@ -338,6 +338,7 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
 
   <footer>
     <span id="foot-dates"></span>
+    <span>Ziyuan Huang · University of Massachusetts Chan Medical School, Microbiology and Microbiome Dynamics AI Hub</span>
     <span>MIT License · <a href="https://github.com/melhzy/benchmark">melhzy/benchmark</a></span>
   </footer>
 </div>
@@ -496,7 +497,7 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
       svgEl("line", { x1: tx, x2: tx, y1: top, y2: H - bottom + 4, class: "gridline" }, g);
       text(g, tx, H - bottom + 18, o.tickFmt(t), "tick axis-label", { "text-anchor": "middle" });
     }
-    if (o.scale !== "log") svgEl("line", { x1: labelW, x2: labelW, y1: top, y2: H - bottom, class: "baseline" }, g);
+    svgEl("line", { x1: labelW, x2: labelW, y1: top, y2: H - bottom, class: "baseline" }, g);
     for (const ref of o.refs || []) {
       const rx = x(ref.x);
       svgEl("line", { x1: rx, x2: rx, y1: top, y2: H - bottom, class: "ref" }, g);
@@ -860,7 +861,7 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
       const ticks = niceTicks(top * 0.95, 4);
       hbars(`ch-${t.test}`, {
         rows: LANGS.map((l) => ({ label: l, lang: l })), series: ["_"], scale: "linear", domain: [0, top], ticks,
-        tickFmt: (v) => nf0.format(v), barH: 12, rowPad: 5, labelW: () => 88,
+        tickFmt: (v) => v >= 1000 ? `${+(v / 1000).toPrecision(3)}k` : nf0.format(v), barH: 12, rowPad: 5, labelW: () => 88,
         get: (r) => t.rate[r.lang], valFmt: (v) => nf3.format(v), color: (r) => col(r.lang),
         refs: peak ? [{ x: peak, label: "" }] : [],
         aria: `Bar chart: ${t.test} in ${t.unit}`,

@@ -167,18 +167,26 @@ the same folder:
   (from `udevadm`, no root needed), GPUs (`lspci`), OpenCL devices, power source and profile, governor,
   transparent huge pages, tool paths. Windows fills the same keys from CIM and the registry (RAM type and
   speed from `Win32_PhysicalMemory`, the power mode as above, `governor` = the power plan) and adds
-  `cpu_base_mhz` and, on hybrid CPUs, `performance_cores` / `efficiency_cores`; it leaves `cpu_max_mhz`
-  empty because Windows does not report a CPU's maximum boost clock. The notebook and the results
-  page compute each machine's theoretical peaks from this file.
+  `cpu_base_mhz`. Both runners then add what **`Cpp/hw_probe`** (built with the C++ program) reports:
+  `cpu_flags` (Windows), on hybrid CPUs `performance_cores` / `efficiency_cores` and `cpu_e_max_mhz`,
+  `cpu_max_mhz` where the OS does not report it (Windows; Linux without cpufreq) with
+  `cpu_max_mhz_source`, and for an NVIDIA GPU `gpu_cuda_name`, `gpu_sm_count`, `gpu_boost_clock_mhz`,
+  `gpu_memory_clock_mhz`, `gpu_memory_bus_bits` and `gpu_memory_gbs` (= 2 × memory clock × bus width / 8,
+  from the CUDA driver that comes with NVIDIA's driver). hw_probe *measures* a core's clock: a chain of
+  dependent register-to-register additions (one cycle each) on a thread pinned to one core of each type,
+  best of 25 samples after 0.3 s of load. After the run, `gpu_clock_max_logged_mhz` = the highest GPU
+  clock in the sensor log is appended. The notebook and the results page compute each machine's
+  theoretical peaks from this file, taking the highest measured clocks over all of a machine's snapshots
+  (a measured boost clock depends on the load at that moment), and for the GPU the higher of the driver's
+  clock and the highest logged one.
 - `sensors_<batch>.csv`: one row per second — phase (language running), CPU temperature and clocks,
   GPU temperature/load/clock (amdgpu sysfs, or `nvidia-smi` on NVIDIA), RAM in use. On Windows the
   clocks are the effective clock (base clock × the `% Processor Performance` counter, as Task Manager
   shows it) and the temperature column is empty.
 
-**Optional, written by hand: `hardware.csv`** (`key,value,source`) — spec-sheet values the operating
-system does not report, which override `system_<batch>.csv` when peaks are computed: `cpu_max_mhz`,
-`cpu_e_max_mhz` (efficiency cores of a hybrid CPU), `gpu_memory_gbs` (memory bandwidth of a discrete GPU).
-`source` says where each value comes from.
+**Optional, written by hand: `hardware.csv`** (`key,value,source`) — corrections that override
+`system_<batch>.csv` when peaks are computed (any of its keys, e.g. `gpu_memory_gbs` for a discrete
+non-NVIDIA GPU, whose memory bus nothing reports). `source` says where each value comes from.
 
 Console output: a short header (language, version, CPU, BLAS, GPU device, mode, output path),
 then one line per test with size, median time and median rate, e.g.
