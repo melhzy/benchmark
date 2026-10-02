@@ -163,7 +163,8 @@ def machine_peaks(system, metas):
     rnd = lambda v, d=1: round(v, d) if np.isfinite(v) else None
     return ({"cpu_fp64": rnd(cpu_peak), "ram": rnd(ram_peak), "gpu_fp32": rnd(cus * lanes * 2 * mhz / 1000), "gpu_mem": rnd(gpu_mem)},
             {"channels": channels, "cus": cus, "mhz": mhz, "discrete": discrete, "gpu_name": re.sub(r"\s*\(.*\)\s*$", "", name),
-             "p_cores": p_cores, "e_cores": e_cores, "ghz": ghz, "e_ghz": e_ghz})
+             "p_cores": p_cores, "e_cores": e_cores, "ghz": ghz, "e_ghz": e_ghz,
+             "clock_measured": system.get("cpu_max_mhz_source", "").startswith("measured")})
 
 
 # ---------------------------------------------------------------------------- data for one machine
@@ -345,9 +346,11 @@ def texts(D):
         cpu_peak = "The CPU's maximum clock is unknown, so its compute peak is left out"
     elif hybrid and np.isfinite(hw["e_ghz"]):
         cpu_peak = (f"The CPU peak assumes all {hw['p_cores']:.0f} performance cores at {max_ghz:.1f} GHz and all "
-                    f"{hw['e_cores']:.0f} efficiency cores at {hw['e_ghz']:.1f} GHz (spec-sheet boost clocks)")
+                    f"{hw['e_cores']:.0f} efficiency cores at {hw['e_ghz']:.1f} GHz"
+                    + (" (the highest clocks measured on one busy core of each type)" if hw["clock_measured"] else ""))
     else:
-        cpu_peak = f"The CPU peak assumes all {cores} cores at full boost ({max_ghz:.1f} GHz)"
+        cpu_peak = (f"The CPU peak assumes all {cores} cores at full boost ({max_ghz:.1f} GHz"
+                    + (", the highest clock measured on one busy core)" if hw["clock_measured"] else ")"))
     T["peak_text"] = (f"Best measured rate as a share of the theoretical peak. {cpu_peak}, which few laptops hold under sustained "
                       "load; matrix multiply goes through OpenBLAS"
                       + (" in every language except R, which on Windows uses its own reference BLAS." if windows and "rblas" in

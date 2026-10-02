@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="How C++, Python, R and JavaScript use a laptop&#x27;s CPU, memory and GPU (Dell Inspiron 14 7425 2-in-1), measured with one shared benchmark suite.">
-<meta property="og:title" content="Four languages, one laptop">
-<meta property="og:description" content="How C++, Python, R and JavaScript use a laptop&#x27;s CPU, memory and GPU (Dell Inspiron 14 7425 2-in-1), measured with one shared benchmark suite.">
+<meta name="description" content="How C++, Python, R and JavaScript use a computer&#x27;s CPU, memory and GPU (Dell Inspiron 14 7425 2-in-1 and Alienware m16 R1), measured with one shared benchmark suite.">
+<meta property="og:title" content="Four languages, two laptops">
+<meta property="og:description" content="How C++, Python, R and JavaScript use a computer&#x27;s CPU, memory and GPU (Dell Inspiron 14 7425 2-in-1 and Alienware m16 R1), measured with one shared benchmark suite.">
 <meta property="og:type" content="website">
 <style>
 :root { color-scheme: light; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
@@ -18,8 +18,8 @@ img { max-width: 100%; }
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,400..800&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
-/* Layout: one reading column (max 1040px); a spec-sheet header, a row of headline scores,
-   then one section per hardware area, each chart with its table underneath. */
+/* Layout: one reading column (max 1040px); a header, the machine comparison, then a sticky machine
+   switcher above one section per hardware area, each chart with its table underneath. */
 :root {
   --bg: #f3f3f0;          /* page plane */
   --surface: #fcfcfb;     /* chart cards */
@@ -54,8 +54,10 @@ img { max-width: 100%; }
   color-scheme: dark;
 }
 body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: var(--step-0); line-height: 1.55; }
-.page { max-width: 1040px; margin: 0 auto; padding-inline: 20px; padding-block: 40px 64px; display: grid; gap: 56px; }
-@media (max-width: 520px) { .page { padding-inline: 16px; padding-block: 24px 48px; gap: 44px; } }
+.page, .machine-view { display: grid; gap: 56px; min-width: 0; }
+.machine-view { scroll-margin-top: 72px; }
+.page { max-width: 1040px; margin: 0 auto; padding-inline: 20px; padding-block: 40px 64px; }
+@media (max-width: 520px) { .page { padding-inline: 16px; padding-block: 24px 48px; } .page, .machine-view { gap: 44px; } }
 h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; line-height: 1.12; }
 h1 { font-size: var(--step-3); font-weight: 780; font-stretch: 118%; letter-spacing: -0.01em; }
 h2 { font-size: var(--step-2); font-weight: 720; font-stretch: 112%; }
@@ -73,7 +75,7 @@ section { display: grid; gap: 18px; min-width: 0; }
 
 /* header */
 header { display: grid; gap: 22px; }
-.spec { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0; border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair); }
+.spec { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0; margin: 0; border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair); }
 .spec div { padding: 12px 16px 12px 0; display: grid; gap: 2px; min-width: 0; }
 .spec dt { font-family: var(--font-data); font-size: var(--step--1); color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
 .spec dd { margin: 0; font-size: 0.95rem; overflow-wrap: anywhere; }
@@ -82,6 +84,24 @@ header { display: grid; gap: 22px; }
 .button:hover { background: var(--wash); }
 .check { display: inline-flex; align-items: center; gap: 8px; color: var(--ink-2); font-size: 0.95rem; }
 .check svg { flex: none; }
+
+/* machine cards (comparison) */
+.machines { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+.mcard { background: var(--surface); border: 1px solid var(--hair); border-radius: 10px; padding: 14px 16px; display: grid; gap: 4px; align-content: start; }
+.mcard .mname { display: flex; align-items: center; gap: 8px; font-weight: 650; }
+.mcard .mos { font-family: var(--font-data); font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.mcard ul { margin: 4px 0 0; padding: 0; list-style: none; color: var(--ink-2); font-size: 0.9rem; display: grid; gap: 2px; }
+
+/* machine switcher: one control above every per-machine section */
+.switcher { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 10px 0; margin-bottom: -38px;
+  border-bottom: 1px solid var(--hair); display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+@media (max-width: 520px) { .switcher { margin-bottom: -30px; } }
+.switcher .lab { font-family: var(--font-data); font-size: var(--step--1); color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 3px; padding: 3px; border: 1px solid var(--hair); border-radius: 8px; background: var(--surface); }
+.seg button { font: inherit; font-size: 0.92rem; border: 0; background: transparent; color: var(--ink-2); padding: 6px 12px; border-radius: 6px; cursor: pointer; }
+.seg button:hover { background: var(--wash); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); font-weight: 600; }
+.mhead { display: grid; gap: 14px; }
 
 /* headline scores */
 .scores { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
@@ -102,6 +122,9 @@ figcaption .t { font-weight: 650; }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
 .legend i { display: inline-block; width: 12px; height: 10px; border-radius: 2px; }
 .legend i.line { height: 2px; width: 16px; border-radius: 1px; }
+.legend i.dot { width: 10px; height: 10px; border-radius: 50%; }
+.legend i.ring { width: 10px; height: 10px; border-radius: 50%; background: transparent !important; box-shadow: inset 0 0 0 2px var(--ink-2); }
+.legend i.fill { width: 10px; height: 10px; border-radius: 50%; background: var(--ink-2) !important; }
 .chart { width: 100%; min-width: 0; }
 .chart svg { display: block; width: 100%; height: auto; overflow: visible; }
 .note { font-size: 0.85rem; color: var(--ink-2); }
@@ -132,10 +155,11 @@ svg text { font-family: var(--font-body); }
 .hit:hover, .hit:focus, .hit.on { fill: var(--wash); outline: none; }
 .phase-label { fill: var(--ink-2); font-size: 11px; font-family: var(--font-data); }
 .crosshair { stroke: var(--ink-2); stroke-width: 1; }
+.stem { stroke: var(--axis); stroke-width: 2; stroke-linecap: round; }
 
 /* tooltip */
 #tip { position: fixed; z-index: 10; pointer-events: none; background: var(--surface); color: var(--ink); border: 1px solid var(--hair);
-  border-radius: 8px; padding: 8px 10px; box-shadow: 0 6px 22px rgba(0, 0, 0, 0.16); font-size: 0.82rem; min-width: 160px; max-width: 300px; }
+  border-radius: 8px; padding: 8px 10px; box-shadow: 0 6px 22px rgba(0, 0, 0, 0.16); font-size: 0.82rem; min-width: 160px; max-width: 320px; }
 #tip .tt { color: var(--ink-2); margin-bottom: 4px; font-family: var(--font-data); font-size: 0.78rem; }
 #tip .tr { display: grid; grid-template-columns: 14px auto 1fr; align-items: center; gap: 2px 8px; }
 #tip .tr i { height: 2px; border-radius: 1px; display: block; }
@@ -157,157 +181,185 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
 <div class="page">
   <header>
     <div class="eyebrow">Benchmark results · <a href="https://github.com/melhzy/benchmark">github.com/melhzy/benchmark</a></div>
-    <h1>Four languages, one laptop</h1>
-    <p class="lede">The same 18 tests, written in C++, Python, R and JavaScript, run on one laptop to see how each language uses its CPU, memory and GPU.</p>
-    <dl class="spec" id="spec"></dl>
+    <h1>Four languages, two laptops</h1>
+    <p class="lede">The same 18 tests, written in C++, Python, R and JavaScript, run on two laptops — Dell Inspiron 14 7425 2-in-1 on Linux and Alienware m16 R1 on Windows — to see how each language uses a computer's CPU, memory and GPU.</p>
     <div class="actions">
       <a class="button" href="https://github.com/melhzy/benchmark">
         <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
         Code and raw data on GitHub
       </a>
-      
-      <span class="check">
-        <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="8" fill="none" stroke="var(--good)" stroke-width="1.6"/><path d="M5.2 9.3l2.4 2.4 5-5.2" fill="none" stroke="var(--good)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        All four languages computed identical answers on all 18 tests
-      </span>
-      
     </div>
   </header>
 
-  <section aria-labelledby="h-overall">
+  <!-- optional:compare -->
+  <section aria-labelledby="h-compare">
     <div class="section-head">
-      <h2 id="h-overall">Overall speed, relative to C++</h2>
-      <p>Each test's best rate divided by C++'s rate on the same test, averaged geometrically within each hardware area, then across the four areas. 1× is as fast as C++.</p>
+      <h2 id="h-compare">Machine against machine</h2>
+      <p id="compare-text"></p>
     </div>
-    <div class="scores" id="scores"></div>
+    <div class="machines" id="mcards"></div>
+    <div class="scores" id="cmp-scores"></div>
     <figure>
-      <figcaption><span class="t">Score by hardware area</span><div class="legend" id="lg-cat"></div></figcaption>
-      <div class="chart" id="ch-cat"></div>
-      <details><summary>Show as a table</summary><div class="table-wrap" id="tb-cat"></div></details>
+      <figcaption><span class="t" id="cmp-tests-title">Speed on one machine relative to the other, per test</span><div class="legend" id="lg-cmp"></div></figcaption>
+      <div class="chart" id="ch-cmp"></div>
+      <details><summary>Show as a table</summary><div class="table-wrap" id="tb-cmp"></div></details>
     </figure>
+    <figure>
+      <figcaption><span class="t">Speed relative to C++ on the same machine</span><div class="legend" id="lg-gap"></div></figcaption>
+      <p class="note">Does each language's distance from C++ depend on the computer? Each row shows one language on both machines; 1× is as fast as C++ on that machine.</p>
+      <div class="chart" id="ch-gap"></div>
+      <details><summary>Show as a table</summary><div class="table-wrap" id="tb-gap"></div></details>
+    </figure>
+    <ul class="findings" id="cmp-findings"></ul>
   </section>
+  <!-- /optional:compare -->
 
-  <section aria-labelledby="h-tests">
-    <div class="section-head">
-      <h2 id="h-tests">Every test</h2>
-      <p>Speed relative to C++ on a log scale, so 0.01× and 10× fit on one axis. Hover a row for the measured rates and the spread across three full runs. Plain loops are where Python and R fall furthest behind; library calls are where they catch up.</p>
-    </div>
-    <figure>
-      <figcaption><span class="t">Speed relative to C++, per test</span><div class="legend" id="lg-tests"></div></figcaption>
-      <div class="chart" id="ch-tests"></div>
-      <details><summary>Show measured rates as a table</summary><div class="table-wrap" id="tb-tests"></div></details>
-    </figure>
-  </section>
+  <div class="switcher" role="group" aria-label="Machine shown below">
+    <span class="lab">Showing</span>
+    <div class="seg" id="seg"></div>
+  </div>
 
-  <section aria-labelledby="h-cores">
-    <div class="section-head">
-      <h2 id="h-cores">Using all cores</h2>
-      <p>The same Mandelbrot work split across 1 to 12 workers. The CPU has 6 physical cores and 12 hardware threads. C++ and JavaScript run their workers as threads; Python and R start separate processes.</p>
+  <div class="machine-view" id="view">
+    <div class="mhead">
+      <dl class="spec" id="spec"></dl>
+      <span class="check" id="verify-badge" hidden>
+        <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="8" fill="none" stroke="var(--good)" stroke-width="1.6"/><path d="M5.2 9.3l2.4 2.4 5-5.2" fill="none" stroke="var(--good)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span data-t="verify_badge"></span>
+      </span>
     </div>
-    <figure>
-      <figcaption><span class="t">Speedup over one worker</span><div class="legend" id="lg-par"></div></figcaption>
-      <div class="chart" id="ch-par"></div>
-      <details><summary>Show as a table</summary><div class="table-wrap" id="tb-par"></div></details>
-    </figure>
-  </section>
 
-  <section aria-labelledby="h-mem">
-    <div class="section-head">
-      <h2 id="h-mem">Memory</h2>
-      <p>Bandwidth against the memory's theoretical peak of 51.2 GB/s (DDR4-3200, two channels). Python and R work on one core; C++ also runs the triad on all cores.</p>
-    </div>
-    <figure>
-      <figcaption><span class="t">Memory bandwidth</span><div class="legend" id="lg-bw"></div></figcaption>
-      <div class="chart" id="ch-bw"></div>
-      <details><summary>Show as a table</summary><div class="table-wrap" id="tb-bw"></div></details>
-    </figure>
-    <div class="grid-2">
+    <section aria-labelledby="h-overall">
+      <div class="section-head">
+        <h2 id="h-overall">Overall speed, relative to C++</h2>
+        <p>Each test's best rate divided by C++'s rate on the same test and machine, averaged geometrically within each hardware area, then across the four areas. 1× is as fast as C++.</p>
+      </div>
+      <div class="scores" id="scores"></div>
       <figure>
-        <figcaption><span class="t">Allocate, fill and sum one big array</span></figcaption>
-        <div class="legend" id="lg-alloc"></div>
-        <div class="chart" id="ch-alloc"></div>
-        <p class="note">NumPy asks Linux for 2 MB memory pages for big arrays, which cuts the number of page faults when new memory is first touched; the other languages use normal 4 KB pages.</p>
-        <details><summary>Show as a table</summary><div class="table-wrap" id="tb-alloc"></div></details>
+        <figcaption><span class="t">Score by hardware area</span><div class="legend" id="lg-cat"></div></figcaption>
+        <div class="chart" id="ch-cat"></div>
+        <details><summary>Show as a table</summary><div class="table-wrap" id="tb-cat"></div></details>
       </figure>
+    </section>
+
+    <section aria-labelledby="h-tests">
+      <div class="section-head">
+        <h2 id="h-tests">Every test</h2>
+        <p>Speed relative to C++ on a log scale, so 0.01× and 10× fit on one axis. Hover a row for the measured rates and the spread across <span data-t="runs_text"></span>. Plain loops are where Python and R fall furthest behind; library calls are where they catch up.</p>
+      </div>
       <figure>
-        <figcaption><span class="t">Random reads from a 2 GiB array</span></figcaption>
-        <div class="chart" id="ch-gather"></div>
-        <p class="note">Nanoseconds per read; lower is better. Each read is a likely cache miss, so this mostly measures memory latency plus each language's per-element overhead.</p>
+        <figcaption><span class="t">Speed relative to C++, per test</span><div class="legend" id="lg-tests"></div></figcaption>
+        <div class="chart" id="ch-tests"></div>
+        <details><summary>Show measured rates as a table</summary><div class="table-wrap" id="tb-tests"></div></details>
       </figure>
-    </div>
-  </section>
+    </section>
 
-  
-  <section aria-labelledby="h-gpu">
-    <div class="section-head">
-      <h2 id="h-gpu">GPU (AMD Radeon Graphics, 7 compute units)</h2>
-      <p>C++, Python and R run identical OpenCL kernels; JavaScript runs a line-by-line WebGPU translation. Once a kernel runs, the language barely matters. Moving data does: R has no 32-bit number type and converts every value, so its uploads are 10× slower than C++'s here.</p>
-    </div>
-    <div class="legend" id="lg-gpu"></div>
-    <div class="grid-2" id="gpu-grid"></div>
-  </section>
-  
+    <section aria-labelledby="h-cores">
+      <div class="section-head">
+        <h2 id="h-cores">Using all cores</h2>
+        <p data-t="cores_text"></p>
+      </div>
+      <figure>
+        <figcaption><span class="t">Speedup over one worker</span><div class="legend" id="lg-par"></div></figcaption>
+        <div class="chart" id="ch-par"></div>
+        <details><summary>Show as a table</summary><div class="table-wrap" id="tb-par"></div></details>
+      </figure>
+    </section>
 
-  <section aria-labelledby="h-peak">
-    <div class="section-head">
-      <h2 id="h-peak">How much of the hardware each language reaches</h2>
-      <p>Best measured rate as a share of the theoretical peak. The CPU peak assumes all 6 cores at full boost (4.4 GHz), which few machines hold under sustained load; matrix multiply goes through OpenBLAS in every language.</p>
-    </div>
-    <figure>
-      <figcaption><span class="t">Share of theoretical peak</span><div class="legend" id="lg-util"></div></figcaption>
-      <div class="chart" id="ch-util"></div>
-      <details><summary>Show as a table</summary><div class="table-wrap" id="tb-util"></div></details>
-    </figure>
-  </section>
+    <section aria-labelledby="h-mem">
+      <div class="section-head">
+        <h2 id="h-mem">Memory</h2>
+        <p data-t="mem_text"></p>
+      </div>
+      <figure>
+        <figcaption><span class="t">Memory bandwidth</span><div class="legend" id="lg-bw"></div></figcaption>
+        <div class="chart" id="ch-bw"></div>
+        <details><summary>Show as a table</summary><div class="table-wrap" id="tb-bw"></div></details>
+      </figure>
+      <div class="grid-2">
+        <figure>
+          <figcaption><span class="t">Allocate, fill and sum one big array</span></figcaption>
+          <div class="legend" id="lg-alloc"></div>
+          <div class="chart" id="ch-alloc"></div>
+          <p class="note" data-t="alloc_note"></p>
+          <details><summary>Show as a table</summary><div class="table-wrap" id="tb-alloc"></div></details>
+        </figure>
+        <figure>
+          <figcaption><span class="t">Random reads from a 2 GiB array</span></figcaption>
+          <div class="chart" id="ch-gather"></div>
+          <p class="note">Nanoseconds per read; lower is better. Each read is a likely cache miss, so this mostly measures memory latency plus each language's per-element overhead.</p>
+        </figure>
+      </div>
+    </section>
 
-  
-  <section aria-labelledby="h-heat">
-    <div class="section-head">
-      <h2 id="h-heat">Heat and clock speed during a run</h2>
-      <p>One full run, sampled every second. The CPU peaked at 100 °C, and while the benchmark ran its average clock was 2.6 GHz against a 4.4 GHz maximum.</p>
-    </div>
-    <figure>
-      <figcaption><span class="t">CPU temperature and average clock, by language</span><span class="note" id="heat-batch"></span></figcaption>
-      <div class="chart" id="ch-heat"></div>
-    </figure>
-  </section>
-  
+    <section aria-labelledby="h-gpu" id="sec-gpu">
+      <div class="section-head">
+        <h2 id="h-gpu" data-t="gpu_title"></h2>
+        <p data-t="gpu_text"></p>
+      </div>
+      <div class="legend" id="lg-gpu"></div>
+      <div class="grid-2" id="gpu-grid"></div>
+    </section>
 
-  <section aria-labelledby="h-find">
-    <div class="section-head"><h2 id="h-find">What the numbers say</h2></div>
-    <ul class="findings">
-      <li style="--k: var(--c-js)"><span><b>JavaScript: 0.75× of C++ speed overall.</b> Beats C++ on <span class="mono">mem_alloc</span> (1.1×) and falls furthest behind on <span class="mono">fib_recursive</span> (0.13×, 8× slower). Plain loops run at 0.51× of C++ and library or vectorized code at 0.78×.</span></li>
-      <li style="--k: var(--c-py)"><span><b>Python: 0.42× of C++ speed overall.</b> Beats C++ on <span class="mono">sort</span> (7.4×) and falls furthest behind on <span class="mono">fib_recursive</span> (0.013×, 75× slower). Plain loops run at 0.026× of C++ and library or vectorized code at 1.1×.</span></li>
-      <li style="--k: var(--c-r)"><span><b>R: 0.17× of C++ speed overall.</b> Beats C++ on <span class="mono">sort</span> (1.3×) and falls furthest behind on <span class="mono">fib_recursive</span> (0.0017×, 573× slower). Plain loops run at 0.013× of C++ and library or vectorized code at 0.3×.</span></li>
-      <li><span><b>All cores:</b> the best parallel speedups are C++ 9.3×, JavaScript 8×, Python 5.4×, R 4×, on 6 physical cores.</span></li>
-      <li><span><b>The hardware sets the ceiling:</b> matrix multiply reaches 231 GFLOP/s at best (55% of the CPU's theoretical peak); GPU compute reaches 798 GFLOP/s (50% of its peak), about the same from every language.</span></li>
-    </ul>
-  </section>
+    <section aria-labelledby="h-peak">
+      <div class="section-head">
+        <h2 id="h-peak">How much of the hardware each language reaches</h2>
+        <p data-t="peak_text"></p>
+      </div>
+      <figure>
+        <figcaption><span class="t">Share of theoretical peak</span><div class="legend" id="lg-util"></div></figcaption>
+        <div class="chart" id="ch-util"></div>
+        <details><summary>Show as a table</summary><div class="table-wrap" id="tb-util"></div></details>
+      </figure>
+    </section>
+
+    <section aria-labelledby="h-heat" id="sec-heat">
+      <div class="section-head">
+        <h2 id="h-heat" data-t="heat_title"></h2>
+        <p data-t="heat_text"></p>
+      </div>
+      <figure>
+        <figcaption><span class="t" id="heat-caption">CPU temperature and average clock, by language</span><span class="note" id="heat-batch"></span></figcaption>
+        <div class="chart" id="ch-heat"></div>
+      </figure>
+    </section>
+
+    <section aria-labelledby="h-find">
+      <div class="section-head"><h2 id="h-find">What the numbers say</h2></div>
+      <ul class="findings" id="findings"></ul>
+    </section>
+  </div>
 
   <section aria-labelledby="h-method">
     <div class="section-head"><h2 id="h-method">How it was measured</h2></div>
     <div class="method">
-      <p>Each language implements the same specification: the same algorithms, the same inputs (generated from one formula, not each language's random generator) and the same output format. Loop-heavy tests use smaller sizes in Python and R, and every result is a rate (work per second), so sizes don't affect the comparison. Each test runs five times after a warm-up; the median counts. The figures above come from the newest full run of each language; the run-to-run spread is in the tooltips (typically 1.2% between runs).</p>
-      <p>Before each language, the runner waits for the CPU to cool below 60 °C. The laptop was on AC power with the balanced power profile. A verify mode runs tiny identical inputs and checks that all languages produce the same answers; on this laptop they agree on all 18 tests, to the last digit for integer results.</p>
-      <p>To add a machine, clone the repository and run:</p>
+      <p>Each language implements the same specification: the same algorithms, the same inputs (generated from one formula, not each language's random generator) and the same output format. Loop-heavy tests use smaller sizes in Python and R, and every result is a rate (work per second), so sizes don't affect the comparison. Each test runs five times after a warm-up; the median counts. The figures above come from the newest full run of each language; the run-to-run spread is in the tooltips (on the <span data-t="machine_name"></span>, <span data-t="spread_text"></span>).</p>
+      <p><span data-t="cool_text"></span> <span data-t="power_text"></span> <span data-t="verify_text"></span> <span data-t="minutes_text"></span></p>
+      <p>To add a machine, clone the repository and run, on Linux:</p>
       <pre>./run_all.sh --check     # what is installed, per language
-./run_all.sh             # about 7 minutes on this laptop; results go to results/&lt;machine&gt;/</pre>
+./run_all.sh             # full run; results go to results/&lt;machine&gt;/</pre>
+      <p>or on Windows (PowerShell or cmd):</p>
+      <pre>powershell -ExecutionPolicy Bypass -File setup_windows.ps1   # OpenBLAS, OpenCL SDK, packages
+.\run_all.cmd --check
+.\run_all.cmd</pre>
       <p>Full definitions are in <a href="https://github.com/melhzy/benchmark/blob/main/common/SPEC.md">common/SPEC.md</a>, and the analysis notebook with more charts is <a href="https://github.com/melhzy/benchmark/blob/main/analysis.ipynb">analysis.ipynb</a>.</p>
     </div>
   </section>
 
   <footer>
-    <span>Results from 1 October 2026 · Dell Inspiron 14 7425 2-in-1</span>
+    <span id="foot-dates"></span>
+    <span>Ziyuan Huang · University of Massachusetts Chan Medical School, Microbiology and Microbiome Dynamics AI Hub</span>
     <span>MIT License · <a href="https://github.com/melhzy/benchmark">melhzy/benchmark</a></span>
   </footer>
 </div>
 <div id="tip" hidden></div>
 
-<script id="data" type="application/json">{"langs":["C++","Python","R","JavaScript"],"categories":{"cpu_single":{"C++":1.0,"Python":0.2297335477664079,"R":0.062127980412977526,"JavaScript":0.5910708667868343},"cpu_multi":{"C++":1.0,"Python":0.11554179642120876,"R":0.09204503418082449,"JavaScript":0.9270501414182596},"ram":{"C++":1.0,"Python":1.1694030921872451,"R":0.33823919284493,"JavaScript":0.8694159225985031},"gpu":{"C++":1.0,"Python":0.9684966512075297,"R":0.38454375805871266,"JavaScript":0.6681851078306135}},"overall":{"C++":1.0,"Python":0.4163959282337517,"R":0.1651445795986598,"JavaScript":0.7511329092353383},"tests":[{"test":"scalar_loop","category":"cpu_single","style":"loop","unit":"M iter/s","rate":{"C++":506.0755,"Python":26.1249,"R":35.6396,"JavaScript":505.184},"range":{"C++":[504.2828,506.6555,3],"Python":[25.6111,26.6382,3],"R":[35.6396,37.682,3],"JavaScript":[505.184,506.5417,3]}},{"test":"mandelbrot","category":"cpu_single","style":"loop","unit":"M px/s","rate":{"C++":15.2533,"Python":0.3879,"R":0.2945,"JavaScript":15.2175},"range":{"C++":[15.1748,15.2545,3],"Python":[0.3619,0.3919,3],"R":[0.278,0.3033,3],"JavaScript":[15.2134,15.2263,3]}},{"test":"fib_recursive","category":"cpu_single","style":"loop","unit":"M calls/s","rate":{"C++":2601.897,"Python":34.8901,"R":4.5441,"JavaScript":338.525},"range":{"C++":[2578.3135,2601.897,3],"Python":[34.8534,36.8875,3],"R":[4.5441,4.6459,3],"JavaScript":[338.525,352.3819,3]}},{"test":"vector_math","category":"cpu_single","style":"vectorized","unit":"M elem/s","rate":{"C++":480.0936,"Python":318.9856,"R":118.4,"JavaScript":206.1679},"range":{"C++":[475.0046,480.0936,3],"Python":[317.9354,319.245,3],"R":[118.4,119.8897,3],"JavaScript":[206.1242,206.1955,3]}},{"test":"sort","category":"cpu_single","style":"builtin","unit":"M items/s","rate":{"C++":11.8702,"Python":87.4321,"R":16.005,"JavaScript":9.8783},"range":{"C++":[11.8702,12.0102,3],"Python":[87.4321,88.1113,3],"R":[15.6622,16.005,3],"JavaScript":[9.85,9.8938,3]}},{"test":"hashmap","category":"cpu_single","style":"builtin","unit":"M ops/s","rate":{"C++":6.8795,"Python":7.1816,"R":0.3002,"JavaScript":6.586},"range":{"C++":[6.8795,7.2448,3],"Python":[7.1816,7.4625,3],"R":[0.2963,0.3002,3],"JavaScript":[6.5323,6.7157,3]}},{"test":"string_ops","category":"cpu_single","style":"builtin","unit":"M items/s","rate":{"C++":10.651,"Python":3.9994,"R":1.1044,"JavaScript":6.0558},"range":{"C++":[10.651,11.0235,3],"Python":[3.9994,4.0725,3],"R":[1.1044,1.3205,3],"JavaScript":[6.0558,6.1509,3]}},{"test":"parallel_mandelbrot","category":"cpu_multi","style":"parallel","unit":"M px/s","rate":{"C++":140.9395,"Python":2.0589,"R":1.1672,"JavaScript":121.4452},"range":{"C++":[139.4374,142.3488,3],"Python":[2.0022,2.114,3],"R":[1.1672,1.2152,3],"JavaScript":[121.4452,131.8817,3]}},{"test":"matmul_blas","category":"cpu_multi","style":"blas","unit":"GFLOP/s","rate":{"C++":225.4113,"Python":205.9916,"R":230.612,"JavaScript":224.8198},"range":{"C++":[221.7144,227.0269,3],"Python":[205.9916,214.907,3],"R":[217.9039,230.612,3],"JavaScript":[222.3132,224.8198,2]}},{"test":"mem_copy","category":"ram","style":"builtin","unit":"GB/s","rate":{"C++":24.5059,"Python":25.6542,"R":4.8779,"JavaScript":24.6389},"range":{"C++":[24.5059,24.7928,3],"Python":[25.4185,25.6542,3],"R":[4.8779,5.1046,3],"JavaScript":[24.6334,25.0918,3]}},{"test":"mem_triad","category":"ram","style":"vectorized","unit":"GB/s","rate":{"C++":23.8079,"Python":13.8334,"R":5.1599,"JavaScript":16.345},"range":{"C++":[23.8079,24.1824,3],"Python":[13.8334,13.9348,3],"R":[5.1599,5.2784,3],"JavaScript":[16.345,16.8728,3]}},{"test":"mem_gather","category":"ram","style":"vectorized","unit":"M accesses/s","rate":{"C++":152.56,"Python":113.9687,"R":76.8335,"JavaScript":112.2537},"range":{"C++":[152.56,155.7008,3],"Python":[113.9687,116.008,3],"R":[76.5272,76.8335,3],"JavaScript":[112.056,114.4517,3]}},{"test":"mem_alloc","category":"ram","style":"builtin","unit":"GB/s","rate":{"C++":3.7144,"Python":15.2864,"R":2.2376,"JavaScript":4.1785},"range":{"C++":[3.7144,3.795,3],"Python":[15.2864,15.5037,3],"R":[2.2376,2.28,3],"JavaScript":[4.1602,4.2287,3]}},{"test":"gpu_fp32_peak","category":"gpu","style":"gpu","unit":"GFLOP/s","rate":{"C++":785.7561,"Python":774.5134,"R":763.3513,"JavaScript":798.3521},"range":{"C++":[785.7561,797.96,3],"Python":[774.5134,794.1212,3],"R":[763.3513,787.5222,3],"JavaScript":[798.1226,799.0983,3]}},{"test":"gpu_bandwidth","category":"gpu","style":"gpu","unit":"GB/s","rate":{"C++":41.1801,"Python":39.6569,"R":38.2299,"JavaScript":40.3156},"range":{"C++":[40.26,41.1801,3],"Python":[39.6569,39.9992,3],"R":[38.2299,39.2419,3],"JavaScript":[39.3153,40.9818,3]}},{"test":"gpu_sgemm","category":"gpu","style":"gpu","unit":"GFLOP/s","rate":{"C++":122.0764,"Python":127.5676,"R":118.228,"JavaScript":96.8367},"range":{"C++":[120.62,163.5511,3],"Python":[117.5317,127.5676,3],"R":[118.228,167.9723,3],"JavaScript":[96.42,98.779,3]}},{"test":"gpu_upload","category":"gpu","style":"gpu","unit":"GB/s","rate":{"C++":14.1974,"Python":15.0563,"R":1.4888,"JavaScript":2.3234},"range":{"C++":[14.1974,15.1455,3],"Python":[15.0563,15.2529,3],"R":[1.4887,1.4937,3],"JavaScript":[2.3234,2.4146,3]}},{"test":"gpu_download","category":"gpu","style":"gpu","unit":"GB/s","rate":{"C++":4.147,"Python":3.3592,"R":0.3807,"JavaScript":4.2776},"range":{"C++":[3.4309,4.5777,3],"Python":[3.3592,3.3666,3],"R":[0.3719,0.3807,3],"JavaScript":[4.0071,4.3705,3]}}],"workers":[1,2,4,6,8,12],"parallel":{"C++":[1.0,2.02,3.95,5.71,7.0,9.26],"Python":[1.0,1.93,3.65,4.87,5.06,5.36],"R":[1.0,1.83,3.21,3.74,3.81,4.0],"JavaScript":[1.0,1.99,3.91,5.56,6.72,8.01]},"triad":{"1":{"C++":21.93,"JavaScript":16.34,"Python":13.83,"R":5.16},"6":{"C++":23.81},"12":{"C++":23.47}},"alloc_sizes":[1.0,2.0,4.0,8.0,16.0],"alloc":{"C++":[3.52,3.57,3.63,3.69,3.71],"Python":[14.92,15.09,15.04,15.23,15.29],"R":[2.24,1.79,1.82,2.04,1.63],"JavaScript":[3.0,4.09,4.13,4.17,4.18]},"alloc_seconds":{"C++":[0.61,1.2,2.37,4.66,9.25],"Python":[0.14,0.28,0.57,1.13,2.25],"R":[0.96,2.4,4.72,8.44,21.06],"JavaScript":[0.72,1.05,2.08,4.12,8.22]},"peaks":{"cpu_fp64":421.4,"ram":51.2,"gpu_fp32":1612.8},"util":[{"name":"CPU compute (FP64 matrix multiply)","peak":421.4,"unit":"GFLOP/s","pct":{"C++":53.5,"Python":48.9,"R":54.7,"JavaScript":53.4}},{"name":"RAM bandwidth (copy or triad, one core)","peak":51.2,"unit":"GB/s","pct":{"C++":47.9,"Python":50.1,"R":10.1,"JavaScript":48.1}},{"name":"GPU compute (FP32 peak kernel)","peak":1612.8,"unit":"GFLOP/s","pct":{"C++":48.7,"Python":48.0,"R":47.3,"JavaScript":49.5}},{"name":"GPU memory bandwidth","peak":51.2,"unit":"GB/s","pct":{"C++":80.4,"Python":77.5,"R":74.7,"JavaScript":78.7}}],"sensors":{"batch":"20261001-135441","t":[0.0,1.0,2.0,3.1,4.1,5.1,6.1,7.2,8.2,9.2,10.2,11.2,12.3,13.3,14.3,15.3,16.3,17.4,18.4,19.4,20.4,21.5,22.5,23.5,24.5,25.5,26.6,27.6,28.6,29.6,30.6,31.7,32.7,33.7,34.7,35.7,36.8,37.8,38.8,39.8,41.0,42.1,43.1,44.2,45.2,46.3,47.3,48.6,49.6,50.7,51.7,52.7,53.7,54.7,55.8,56.8,57.8,58.8,59.8,60.9,61.9,62.9,63.9,65.0,66.0,67.0,68.0,69.0,70.1,71.1,72.1,73.1,74.2,75.2,76.2,77.2,78.2,79.3,80.3,81.3,82.3,83.3,84.4,85.4,86.4,87.4,88.4,89.5,90.5,91.5,92.5,93.6,94.6,95.6,96.6,97.6,98.7,99.7,100.7,101.7,102.7,103.8,104.8,105.8,106.8,107.9,108.9,109.9,110.9,112.0,113.0,114.0,115.0,116.0,117.1,118.1,119.1,120.1,121.1,122.2,123.3,124.3,125.4,126.6,127.7,128.7,129.7,130.8,131.8,132.8,133.8,134.9,135.9,136.9,138.0,139.0,140.0,141.0,142.1,143.1,144.1,145.2,146.2,147.2,148.2,149.3,150.3,151.3,152.3,153.4,154.4,155.4,156.5,157.5,158.5,159.5,160.6,161.6,162.6,163.6,164.7,165.7,166.7,167.7,168.7,169.8,170.8,171.8,172.8,173.9,174.9,175.9,176.9,178.0,179.0,180.0,181.0,182.0,183.1,184.1,185.1,186.1,187.1,188.2,189.2,190.2,191.2,192.2,193.3,194.3,195.3,196.3,197.4,198.4,199.4,200.4,201.4,202.5,203.5,204.5,205.5,206.5,207.6,208.6,209.6,210.6,211.7,212.7,213.7,214.7,215.7,216.8,217.8,218.8,219.8,220.9,221.9,222.9,223.9,224.9,226.0,227.0,228.0,229.0,230.1,231.1,232.1,233.1,234.2,235.3,236.4,237.5,238.5,239.5,240.5,241.6,242.6,243.6,244.6,245.7,246.7,247.7,248.7,249.7,250.8,251.8,252.8,253.8,254.9,255.9,256.9,257.9,259.0,260.0,261.0,262.0,263.1,264.1,265.1,266.1,267.2,268.2,269.2,270.2,271.2,272.3,273.3,274.3,275.3,276.4,277.4,278.4,279.4,280.4,281.5,282.5,283.5,284.5,285.5,286.6,287.6,288.6,289.6,290.6,291.7,292.7,293.7,294.7,295.8,296.8,297.8,298.8,299.9,300.9,301.9,302.9,303.9,305.0,306.0,307.0,308.0,309.0,310.1,311.1,312.1,313.1,314.1,315.2,316.2,317.2,318.2,319.2,320.3,321.3,322.3,323.3,324.4,325.4,326.4,327.4,328.5,329.5,330.5,331.5,332.5,333.6,334.6,335.6,336.6,337.6,338.7,339.7,340.7,341.7,342.8,343.8,344.8,345.8,346.9,347.9,348.9,349.9,351.0,352.0,353.0,354.0,355.1,356.1,357.1,358.1,359.1,360.2,361.2,362.2,363.2,364.3,365.3,366.3,367.3,368.3,369.4,370.4,371.4,372.4,373.5,374.5,375.5,376.5,377.5,378.6,379.6,380.6,381.6,382.6,383.7,384.7,385.7,386.7,387.7,388.8,389.8,390.8,391.8,392.9,393.9,394.9,395.9,397.0,398.1,399.2,400.3,401.4,402.4,403.4,404.5,405.5,406.5,407.5,408.6,409.6,410.6,411.6,412.7,413.7,414.7,415.7,416.7,417.8,418.8,419.8,420.8,421.8,422.9,423.9,424.9,425.9,427.0,428.0,429.0,430.0,431.0,432.1,433.1,434.1,435.1,436.2,437.2],"phase":["cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","idle","idle"],"cpu_temp":[45.2,52.9,53.9,55.0,55.4,55.9,56.8,58.6,59.6,60.5,70.1,78.0,78.6,77.6,77.2,76.9,76.8,76.4,76.8,76.9,76.6,77.5,77.4,77.2,76.0,74.9,73.9,73.1,72.4,71.5,71.1,73.0,76.9,78.8,79.4,78.4,77.6,77.5,82.6,86.5,89.1,90.6,92.0,92.9,91.9,91.2,90.0,90.2,90.5,89.8,88.6,87.5,86.9,86.2,85.8,85.0,84.8,84.2,83.8,83.0,83.0,82.5,82.0,81.5,81.1,80.8,80.2,79.5,78.6,80.6,79.2,78.2,79.2,78.6,77.2,75.0,72.8,70.8,68.8,67.0,65.4,63.8,62.5,61.4,60.1,59.2,58.1,57.1,56.2,76.1,90.5,95.8,98.2,99.1,99.4,99.4,99.5,99.8,99.9,100.0,99.9,96.8,95.0,93.8,91.6,89.8,88.2,86.8,85.2,84.0,83.1,82.0,86.8,89.2,91.0,96.0,98.5,99.4,99.1,98.5,97.2,96.2,95.1,94.4,93.4,92.1,91.0,89.9,89.0,87.4,85.8,84.2,83.9,84.4,85.8,84.9,88.1,86.0,83.9,81.9,79.8,77.2,74.8,72.5,70.2,68.2,66.4,64.6,63.0,61.5,60.1,58.9,57.8,56.6,55.8,68.5,87.9,95.4,98.1,99.2,99.6,100.0,100.0,100.2,100.2,100.2,100.4,98.4,96.4,94.5,94.8,93.8,94.6,95.2,95.0,94.8,94.1,94.8,92.6,89.8,87.0,84.2,82.4,80.1,78.2,76.6,75.6,74.5,73.5,72.9,72.2,71.5,70.9,70.8,70.2,69.8,69.6,69.8,69.1,68.8,68.8,70.6,71.9,73.1,74.1,74.0,79.4,84.0,84.5,87.0,85.2,87.5,85.9,88.0,87.2,88.0,86.6,87.1,95.4,98.2,98.1,97.5,95.9,94.4,93.5,92.4,89.5,86.8,84.9,84.5,84.5,85.2,85.6,85.8,84.4,82.9,81.5,82.4,83.1,81.6,82.1,82.4,82.8,82.8,82.2,80.9,79.4,78.1,76.9,75.8,74.8,73.9,73.0,73.0,72.6,73.0,72.2,74.8,73.5,72.9,71.9,71.1,70.4,69.6,69.4,69.4,71.2,70.6,70.2,74.1,72.9,72.2,71.5,72.5,79.5,78.1,76.4,75.5,74.8,74.1,73.1,72.8,87.6,85.4,83.0,82.4,81.5,81.4,80.8,79.8,78.9,78.0,77.2,76.0,75.5,75.0,74.6,74.1,73.9,73.5,89.0,96.0,98.5,97.5,94.4,91.5,88.8,87.5,86.4,84.0,81.6,79.6,78.9,76.9,75.5,73.9,72.6,72.2,72.6,72.2,71.8,71.5,71.9,72.1,71.9,71.2,70.6,71.5,72.5,73.5,72.9,72.2,71.1,71.5,69.4,67.2,65.4,63.6,62.0,60.5,59.1,57.9,57.0,59.8,61.1,61.5,61.9,62.1,62.2,65.6,67.2,67.8,68.1,88.4,95.8,98.4,99.4,99.9,99.5,96.0,94.1,93.6,93.1,92.8,92.4,92.1,91.8,91.5,91.2,91.2,91.0,91.1,89.9,87.9,86.1,84.6,83.0,81.9,80.6,79.8,78.6,78.0,78.0,86.5,91.2,90.0,88.6,88.1,87.8,87.2,87.0,87.4,86.4,86.6,92.6,93.6,92.2,90.4,88.6,86.9,86.2,86.2,85.8,86.4,85.9,85.5,85.1,86.4,88.5,87.9,87.2,86.8,86.2,85.8,85.2,88.5,92.6,92.4,91.4,89.6,88.6,87.5,85.8,84.4,82.8,80.4,77.6],"cpu_mhz":[3063,2122,2320,2759,2312,2553,2534,2557,2380,2734,2651,2507,2527,2661,3069,2433,2476,2581,2428,2502,3043,3394,2691,3045,2636,3210,2638,2497,3077,2654,2381,3018,2721,2517,3440,2366,2527,2935,3685,2983,2924,3014,3387,2808,2674,2733,3862,4167,3049,2690,2556,3029,2982,3456,3160,2614,2644,3023,2705,2548,3262,2750,3352,3194,2791,3131,2961,3014,2366,2432,2609,2263,3559,3088,2867,2854,2870,2382,2433,2405,2701,2816,3138,2367,2231,2322,2432,2316,2807,3301,2945,3675,2455,2659,2498,2447,3505,3393,2899,2622,2718,2892,2214,3167,3005,3045,2956,3682,2048,2241,2782,2679,2184,2907,2639,2316,3128,3096,3565,3231,3465,3035,3042,2900,2292,2679,3070,2244,2078,2306,2762,2517,2787,2510,2433,2730,1993,2027,1843,1856,1768,2305,1593,1842,1496,1692,1674,1673,1563,1587,1645,1615,1647,1661,1873,2267,2272,2603,2184,2267,2238,2625,2613,2482,2180,2579,2595,2495,2385,2703,2326,2543,3187,2087,2486,2581,2407,2312,2829,2367,2341,2253,2551,2315,2312,2336,2256,2465,2295,2317,2525,2366,2566,2421,2366,2524,2547,2698,2508,2186,2343,2566,2101,2370,2560,2107,2840,2372,2517,2538,2520,2533,2504,2309,3047,2329,2433,2653,2555,2642,2724,2451,2230,2473,2628,2160,2705,2764,2979,2982,3298,3868,2526,2082,2311,2882,2210,2333,2040,2225,2537,2472,2747,2844,2596,2174,2302,2077,2280,2120,2641,2732,2614,2740,2592,2513,2413,2579,2827,2554,2505,3040,2710,2548,2776,2741,2654,2729,2449,2554,2491,2507,2489,2474,2342,2302,2209,2276,2498,2369,2349,2307,2362,2648,2783,3616,4183,2830,3194,2532,2854,2781,2244,2169,2028,2319,2694,2351,2746,2752,3270,2649,2577,2552,2783,2379,2003,2481,2739,2475,2577,3059,2385,2330,1830,3018,2316,2657,2975,2819,2309,2541,2681,2296,2350,2324,2364,2314,2156,2299,2641,2171,2813,2095,1612,1669,1725,1614,2169,1981,1730,1732,1803,3021,2698,2917,2124,2515,2805,2611,3064,2705,2694,2682,2569,2407,2130,2630,2394,2295,2233,2438,2575,2654,2362,2532,2400,2216,2812,2294,2738,2753,2722,2839,2515,2581,2209,2376,2852,3063,3160,2311,2869,3044,2887,2733,4238,3021,2983,2923,2869,2678,3018,2428,2305,2599,2343,3003,2352,2774,3159,2828,2943,2989,2429,2783,2691,2659,3238,2520,2172,2468,2289,2314,3175,3680,3069,3018,2784,3385,2336,2995,2504,2522,2767,1824,1953],"gpu_busy":[2,3,1,2,1,2,3,2,1,2,3,1,1,2,2,3,2,0,2,1,1,2,2,4,4,5,3,3,2,3,4,4,3,2,5,2,4,2,1,1,0,3,1,3,1,0,0,2,4,3,10,4,3,2,3,2,2,2,4,3,2,3,3,3,2,3,3,3,2,4,65,69,42,25,13,6,4,3,3,3,3,2,3,2,2,2,2,2,2,4,4,4,3,3,3,2,3,3,3,2,3,3,2,2,2,2,3,2,2,2,2,2,3,2,3,3,3,4,5,5,6,5,7,6,6,4,3,3,3,4,4,3,4,4,4,3,29,58,74,37,19,7,2,2,0,0,0,0,0,0,0,0,0,0,0,2,1,0,1,2,0,2,0,1,1,2,1,2,0,1,2,1,1,1,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,2,0,0,0,0,0,0,1,1,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,2,0,2,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,1,1,1,0,2,3,1,2,1,0,0,1,1,1,0,0,0,0,0,0,1,4,6,5,4,3,3,3,3,3,3,3,3,2,2,2,3,3,3,2,2,2,2,2,24,32,37,18,11,16,19,22,24,10,5,4,2,3,4,4,3,2,3,2,2,4,2,4,4,3,2,2,2,2,1,1,1,1,3,2,2,3,2,2,4,4,4,3,4,3,3,3,3,4,3,3,3,4,3,2,2,2,2,2,2,2,1,3,2,3,3,2,2,2,3,3,3,4,4,5,5,6,7,7,7,6,6,4,3,2,4,2,3,2,2,4,3,2,2,3,2,3,3,3,2,3,2,2,2,2,1,2,3,60,50,77,49,25,17,19,7,3],"ram":[3.77,3.86,3.87,3.87,3.87,3.87,3.86,3.86,3.86,3.86,3.86,3.85,4.22,4.15,4.15,4.15,4.15,4.15,4.15,4.15,4.15,4.15,4.15,4.05,4.08,4.08,4.08,4.08,4.09,4.09,4.08,4.28,4.41,4.41,4.21,4.21,4.19,4.19,4.17,4.41,4.41,4.4,4.37,6.07,5.13,7.07,7.07,6.99,5.92,6.47,6.47,6.47,4.57,5.15,6.24,7.97,5.46,7.93,10.44,11.99,4.96,7.08,9.57,11.53,14.05,16.55,19.07,20.01,19.31,4.42,4.42,4.73,4.53,5.92,4.61,4.59,4.57,4.56,4.54,4.52,4.5,4.49,4.47,4.46,4.44,4.42,4.4,4.39,4.37,4.36,4.35,4.33,4.32,4.31,4.29,4.28,4.26,4.25,4.23,4.21,4.74,4.7,4.62,4.59,4.82,4.83,4.55,4.61,4.67,4.66,4.74,4.89,4.38,4.37,4.37,4.35,4.33,4.33,4.32,4.33,4.68,4.74,4.68,4.66,6.15,7.54,8.25,8.1,7.55,7.46,7.14,7.11,6.18,10.95,9.88,20.32,4.83,4.78,4.77,5.7,4.47,4.46,4.44,4.33,4.27,4.25,4.21,4.14,4.15,4.05,4.05,3.98,3.97,3.97,3.9,3.99,3.99,3.95,3.95,3.95,3.92,3.92,3.92,3.92,3.92,3.92,3.92,5.05,5.05,5.05,5.37,5.02,4.9,4.84,4.77,4.75,4.43,4.62,4.61,4.67,4.68,4.7,4.82,4.8,4.79,4.79,4.78,4.77,4.76,4.76,4.71,4.71,4.7,4.7,4.69,4.68,4.67,4.65,4.63,4.63,4.63,4.7,4.75,4.73,4.72,4.72,4.67,4.67,4.62,4.62,4.57,4.57,4.56,4.49,4.49,4.45,4.44,4.39,4.39,4.39,4.38,4.38,4.38,4.38,4.37,4.38,4.63,4.75,4.97,5.01,4.97,4.94,4.91,4.78,5.58,6.08,6.11,7.01,7.01,6.89,6.17,6.03,6.94,6.94,6.33,6.33,7.33,7.32,7.32,7.32,7.32,7.32,5.41,6.86,6.9,8.37,8.69,7.98,8.3,7.17,7.1,7.02,7.07,7.07,7.13,5.57,4.87,6.13,7.29,6.7,4.8,6.75,8.29,10.3,10.3,4.75,5.36,7.87,9.96,12.31,13.76,16.15,16.33,16.33,14.71,4.76,5.46,7.82,10.24,12.77,15.31,17.86,20.36,21.62,24.04,26.45,28.86,31.28,33.69,36.11,36.36,36.36,36.36,36.36,36.36,36.36,36.1,21.29,5.86,4.77,4.76,4.74,6.03,5.11,5.1,5.07,5.06,5.54,5.88,5.81,5.81,5.77,4.82,5.53,5.82,5.85,5.43,6.34,5.77,6.35,5.87,7.29,6.28,5.19,5.17,5.15,5.12,5.1,5.07,5.05,5.04,5.02,5.0,4.98,4.96,4.94,4.92,4.9,4.88,4.85,4.83,4.81,4.79,4.77,4.75,4.72,4.69,4.67,4.73,4.72,4.36,4.36,4.5,4.49,4.63,4.62,4.63,4.63,4.62,4.62,4.6,4.59,4.24,4.45,4.39,4.37,4.37,4.35,4.37,4.29,4.35,4.27,4.34,4.55,4.51,4.45,4.44,4.66,4.64,4.62,4.59,6.12,7.22,6.67,6.96,5.95,6.67,6.65,6.63,6.61,4.68,5.24,6.64,8.27,5.73,8.2,10.69,12.19,5.12,6.64,9.1,11.6,14.09,16.6,19.1,20.1,20.09,5.91,4.73,5.59,4.64,6.1,6.08,5.67,6.04,4.45,4.43]},"system":{"vendor":"Dell Inc.","product":"Inspiron 14 7425 2-in-1","chassis":"laptop","cpu":"AMD Ryzen 5 5625U with Radeon Graphics","cpu_max_mhz":"4390","physical_cores":"6","logical_cpus":"12","ram_gib":"61.2","ram_type":"DDR4","ram_speed_mts":"3200","ram_modules":"2","ram_module_sizes_gib":"32 32","gpus":"Advanced Micro Devices, Inc. [AMD/ATI] Barcelo (rev c2)","os":"Ubuntu 26.04.1 LTS","kernel":"7.0.0-34-generic","power":"AC","platform_profile":"balanced"},"version_labels":{"C++":"g++ 15.2.0, -O3","Python":"CPython 3.14.7 + NumPy 2.5.3","R":"R 4.5.2","JavaScript":"Node.js v24.21.0"},"newest_batch":{"C++":"20261001-135441","Python":"20261001-135441","R":"20261001-135441","JavaScript":"20261001-135441"},"memory_text":"2 \u00d7 32 GB DDR4-3200, two channels (51.2 GB/s peak)","gpu_text":"AMD Radeon Graphics \u00b7 7 compute units \u00b7 1.8 GHz","runs_text":"three full runs, AC power, balanced profile"}</script>
+<script id="data" type="application/json">{"machines":[{"id":"dell-inc-inspiron-14-7425-2-in-1","langs":["C++","Python","R","JavaScript"],"categories":{"cpu_single":{"C++":1.0,"Python":0.2297335477664079,"R":0.062127980412977526,"JavaScript":0.5910708667868343},"cpu_multi":{"C++":1.0,"Python":0.11554179642120876,"R":0.09204503418082449,"JavaScript":0.9270501414182596},"ram":{"C++":1.0,"Python":1.1694030921872451,"R":0.33823919284493,"JavaScript":0.8694159225985031},"gpu":{"C++":1.0,"Python":0.9684966512075297,"R":0.38454375805871266,"JavaScript":0.6681851078306135}},"overall":{"C++":1.0,"Python":0.4163959282337517,"R":0.1651445795986598,"JavaScript":0.7511329092353383},"tests":[{"test":"scalar_loop","category":"cpu_single","style":"loop","unit":"M iter/s","rate":{"C++":506.0755,"Python":26.1249,"R":35.6396,"JavaScript":505.184},"range":{"C++":[504.2828,506.6555,3],"Python":[25.6111,26.6382,3],"R":[35.6396,37.682,3],"JavaScript":[505.184,506.5417,3]}},{"test":"mandelbrot","category":"cpu_single","style":"loop","unit":"M px/s","rate":{"C++":15.2533,"Python":0.3879,"R":0.2945,"JavaScript":15.2175},"range":{"C++":[15.1748,15.2545,3],"Python":[0.3619,0.3919,3],"R":[0.278,0.3033,3],"JavaScript":[15.2134,15.2263,3]}},{"test":"fib_recursive","category":"cpu_single","style":"loop","unit":"M calls/s","rate":{"C++":2601.897,"Python":34.8901,"R":4.5441,"JavaScript":338.525},"range":{"C++":[2578.3135,2601.897,3],"Python":[34.8534,36.8875,3],"R":[4.5441,4.6459,3],"JavaScript":[338.525,352.3819,3]}},{"test":"vector_math","category":"cpu_single","style":"vectorized","unit":"M elem/s","rate":{"C++":480.0936,"Python":318.9856,"R":118.4,"JavaScript":206.1679},"range":{"C++":[475.0046,480.0936,3],"Python":[317.9354,319.245,3],"R":[118.4,119.8897,3],"JavaScript":[206.1242,206.1955,3]}},{"test":"sort","category":"cpu_single","style":"builtin","unit":"M items/s","rate":{"C++":11.8702,"Python":87.4321,"R":16.005,"JavaScript":9.8783},"range":{"C++":[11.8702,12.0102,3],"Python":[87.4321,88.1113,3],"R":[15.6622,16.005,3],"JavaScript":[9.85,9.8938,3]}},{"test":"hashmap","category":"cpu_single","style":"builtin","unit":"M ops/s","rate":{"C++":6.8795,"Python":7.1816,"R":0.3002,"JavaScript":6.586},"range":{"C++":[6.8795,7.2448,3],"Python":[7.1816,7.4625,3],"R":[0.2963,0.3002,3],"JavaScript":[6.5323,6.7157,3]}},{"test":"string_ops","category":"cpu_single","style":"builtin","unit":"M items/s","rate":{"C++":10.651,"Python":3.9994,"R":1.1044,"JavaScript":6.0558},"range":{"C++":[10.651,11.0235,3],"Python":[3.9994,4.0725,3],"R":[1.1044,1.3205,3],"JavaScript":[6.0558,6.1509,3]}},{"test":"parallel_mandelbrot","category":"cpu_multi","style":"parallel","unit":"M px/s","rate":{"C++":140.9395,"Python":2.0589,"R":1.1672,"JavaScript":121.4452},"range":{"C++":[139.4374,142.3488,3],"Python":[2.0022,2.114,3],"R":[1.1672,1.2152,3],"JavaScript":[121.4452,131.8817,3]}},{"test":"matmul_blas","category":"cpu_multi","style":"blas","unit":"GFLOP/s","rate":{"C++":225.4113,"Python":205.9916,"R":230.612,"JavaScript":224.8198},"range":{"C++":[221.7144,227.0269,3],"Python":[205.9916,214.907,3],"R":[217.9039,230.612,3],"JavaScript":[222.3132,224.8198,2]}},{"test":"mem_copy","category":"ram","style":"builtin","unit":"GB/s","rate":{"C++":24.5059,"Python":25.6542,"R":4.8779,"JavaScript":24.6389},"range":{"C++":[24.5059,24.7928,3],"Python":[25.4185,25.6542,3],"R":[4.8779,5.1046,3],"JavaScript":[24.6334,25.0918,3]}},{"test":"mem_triad","category":"ram","style":"vectorized","unit":"GB/s","rate":{"C++":23.8079,"Python":13.8334,"R":5.1599,"JavaScript":16.345},"range":{"C++":[23.8079,24.1824,3],"Python":[13.8334,13.9348,3],"R":[5.1599,5.2784,3],"JavaScript":[16.345,16.8728,3]}},{"test":"mem_gather","category":"ram","style":"vectorized","unit":"M accesses/s","rate":{"C++":152.56,"Python":113.9687,"R":76.8335,"JavaScript":112.2537},"range":{"C++":[152.56,155.7008,3],"Python":[113.9687,116.008,3],"R":[76.5272,76.8335,3],"JavaScript":[112.056,114.4517,3]}},{"test":"mem_alloc","category":"ram","style":"builtin","unit":"GB/s","rate":{"C++":3.7144,"Python":15.2864,"R":2.2376,"JavaScript":4.1785},"range":{"C++":[3.7144,3.795,3],"Python":[15.2864,15.5037,3],"R":[2.2376,2.28,3],"JavaScript":[4.1602,4.2287,3]}},{"test":"gpu_fp32_peak","category":"gpu","style":"gpu","unit":"GFLOP/s","rate":{"C++":785.7561,"Python":774.5134,"R":763.3513,"JavaScript":798.3521},"range":{"C++":[785.7561,797.96,3],"Python":[774.5134,794.1212,3],"R":[763.3513,787.5222,3],"JavaScript":[798.1226,799.0983,3]}},{"test":"gpu_bandwidth","category":"gpu","style":"gpu","unit":"GB/s","rate":{"C++":41.1801,"Python":39.6569,"R":38.2299,"JavaScript":40.3156},"range":{"C++":[40.26,41.1801,3],"Python":[39.6569,39.9992,3],"R":[38.2299,39.2419,3],"JavaScript":[39.3153,40.9818,3]}},{"test":"gpu_sgemm","category":"gpu","style":"gpu","unit":"GFLOP/s","rate":{"C++":122.0764,"Python":127.5676,"R":118.228,"JavaScript":96.8367},"range":{"C++":[120.62,163.5511,3],"Python":[117.5317,127.5676,3],"R":[118.228,167.9723,3],"JavaScript":[96.42,98.779,3]}},{"test":"gpu_upload","category":"gpu","style":"gpu","unit":"GB/s","rate":{"C++":14.1974,"Python":15.0563,"R":1.4888,"JavaScript":2.3234},"range":{"C++":[14.1974,15.1455,3],"Python":[15.0563,15.2529,3],"R":[1.4887,1.4937,3],"JavaScript":[2.3234,2.4146,3]}},{"test":"gpu_download","category":"gpu","style":"gpu","unit":"GB/s","rate":{"C++":4.147,"Python":3.3592,"R":0.3807,"JavaScript":4.2776},"range":{"C++":[3.4309,4.5777,3],"Python":[3.3592,3.3666,3],"R":[0.3719,0.3807,3],"JavaScript":[4.0071,4.3705,3]}}],"workers":[1,2,4,6,8,12],"parallel":{"C++":[1.0,2.02,3.95,5.71,7.0,9.26],"Python":[1.0,1.93,3.65,4.87,5.06,5.36],"R":[1.0,1.83,3.21,3.74,3.81,4.0],"JavaScript":[1.0,1.99,3.91,5.56,6.72,8.01]},"triad":{"1":{"C++":21.93,"JavaScript":16.34,"Python":13.83,"R":5.16},"6":{"C++":23.81},"12":{"C++":23.47}},"alloc_sizes":[1.0,2.0,4.0,8.0,16.0],"alloc":{"C++":[3.52,3.57,3.63,3.69,3.71],"Python":[14.92,15.09,15.04,15.23,15.29],"R":[2.24,1.79,1.82,2.04,1.63],"JavaScript":[3.0,4.09,4.13,4.17,4.18]},"alloc_seconds":{"C++":[0.61,1.2,2.37,4.66,9.25],"Python":[0.14,0.28,0.57,1.13,2.25],"R":[0.96,2.4,4.72,8.44,21.06],"JavaScript":[0.72,1.05,2.08,4.12,8.22]},"peaks":{"cpu_fp64":421.4,"ram":51.2,"gpu_fp32":1612.8,"gpu_mem":51.2},"util":[{"name":"CPU compute (FP64 matrix multiply)","peak":421.4,"unit":"GFLOP/s","pct":{"C++":53.5,"Python":48.9,"R":54.7,"JavaScript":53.4}},{"name":"RAM bandwidth (copy or triad, one core)","peak":51.2,"unit":"GB/s","pct":{"C++":47.9,"Python":50.1,"R":10.1,"JavaScript":48.1}},{"name":"GPU compute (FP32 peak kernel)","peak":1612.8,"unit":"GFLOP/s","pct":{"C++":48.7,"Python":48.0,"R":47.3,"JavaScript":49.5}},{"name":"GPU memory bandwidth","peak":51.2,"unit":"GB/s","pct":{"C++":80.4,"Python":77.5,"R":74.7,"JavaScript":78.7}}],"sensors":{"batch":"20261001-135441","t":[0.0,1.0,2.0,3.1,4.1,5.1,6.1,7.2,8.2,9.2,10.2,11.2,12.3,13.3,14.3,15.3,16.3,17.4,18.4,19.4,20.4,21.5,22.5,23.5,24.5,25.5,26.6,27.6,28.6,29.6,30.6,31.7,32.7,33.7,34.7,35.7,36.8,37.8,38.8,39.8,41.0,42.1,43.1,44.2,45.2,46.3,47.3,48.6,49.6,50.7,51.7,52.7,53.7,54.7,55.8,56.8,57.8,58.8,59.8,60.9,61.9,62.9,63.9,65.0,66.0,67.0,68.0,69.0,70.1,71.1,72.1,73.1,74.2,75.2,76.2,77.2,78.2,79.3,80.3,81.3,82.3,83.3,84.4,85.4,86.4,87.4,88.4,89.5,90.5,91.5,92.5,93.6,94.6,95.6,96.6,97.6,98.7,99.7,100.7,101.7,102.7,103.8,104.8,105.8,106.8,107.9,108.9,109.9,110.9,112.0,113.0,114.0,115.0,116.0,117.1,118.1,119.1,120.1,121.1,122.2,123.3,124.3,125.4,126.6,127.7,128.7,129.7,130.8,131.8,132.8,133.8,134.9,135.9,136.9,138.0,139.0,140.0,141.0,142.1,143.1,144.1,145.2,146.2,147.2,148.2,149.3,150.3,151.3,152.3,153.4,154.4,155.4,156.5,157.5,158.5,159.5,160.6,161.6,162.6,163.6,164.7,165.7,166.7,167.7,168.7,169.8,170.8,171.8,172.8,173.9,174.9,175.9,176.9,178.0,179.0,180.0,181.0,182.0,183.1,184.1,185.1,186.1,187.1,188.2,189.2,190.2,191.2,192.2,193.3,194.3,195.3,196.3,197.4,198.4,199.4,200.4,201.4,202.5,203.5,204.5,205.5,206.5,207.6,208.6,209.6,210.6,211.7,212.7,213.7,214.7,215.7,216.8,217.8,218.8,219.8,220.9,221.9,222.9,223.9,224.9,226.0,227.0,228.0,229.0,230.1,231.1,232.1,233.1,234.2,235.3,236.4,237.5,238.5,239.5,240.5,241.6,242.6,243.6,244.6,245.7,246.7,247.7,248.7,249.7,250.8,251.8,252.8,253.8,254.9,255.9,256.9,257.9,259.0,260.0,261.0,262.0,263.1,264.1,265.1,266.1,267.2,268.2,269.2,270.2,271.2,272.3,273.3,274.3,275.3,276.4,277.4,278.4,279.4,280.4,281.5,282.5,283.5,284.5,285.5,286.6,287.6,288.6,289.6,290.6,291.7,292.7,293.7,294.7,295.8,296.8,297.8,298.8,299.9,300.9,301.9,302.9,303.9,305.0,306.0,307.0,308.0,309.0,310.1,311.1,312.1,313.1,314.1,315.2,316.2,317.2,318.2,319.2,320.3,321.3,322.3,323.3,324.4,325.4,326.4,327.4,328.5,329.5,330.5,331.5,332.5,333.6,334.6,335.6,336.6,337.6,338.7,339.7,340.7,341.7,342.8,343.8,344.8,345.8,346.9,347.9,348.9,349.9,351.0,352.0,353.0,354.0,355.1,356.1,357.1,358.1,359.1,360.2,361.2,362.2,363.2,364.3,365.3,366.3,367.3,368.3,369.4,370.4,371.4,372.4,373.5,374.5,375.5,376.5,377.5,378.6,379.6,380.6,381.6,382.6,383.7,384.7,385.7,386.7,387.7,388.8,389.8,390.8,391.8,392.9,393.9,394.9,395.9,397.0,398.1,399.2,400.3,401.4,402.4,403.4,404.5,405.5,406.5,407.5,408.6,409.6,410.6,411.6,412.7,413.7,414.7,415.7,416.7,417.8,418.8,419.8,420.8,421.8,422.9,423.9,424.9,425.9,427.0,428.0,429.0,430.0,431.0,432.1,433.1,434.1,435.1,436.2,437.2],"phase":["cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","idle","idle"],"cpu_temp":[45.2,52.9,53.9,55.0,55.4,55.9,56.8,58.6,59.6,60.5,70.1,78.0,78.6,77.6,77.2,76.9,76.8,76.4,76.8,76.9,76.6,77.5,77.4,77.2,76.0,74.9,73.9,73.1,72.4,71.5,71.1,73.0,76.9,78.8,79.4,78.4,77.6,77.5,82.6,86.5,89.1,90.6,92.0,92.9,91.9,91.2,90.0,90.2,90.5,89.8,88.6,87.5,86.9,86.2,85.8,85.0,84.8,84.2,83.8,83.0,83.0,82.5,82.0,81.5,81.1,80.8,80.2,79.5,78.6,80.6,79.2,78.2,79.2,78.6,77.2,75.0,72.8,70.8,68.8,67.0,65.4,63.8,62.5,61.4,60.1,59.2,58.1,57.1,56.2,76.1,90.5,95.8,98.2,99.1,99.4,99.4,99.5,99.8,99.9,100.0,99.9,96.8,95.0,93.8,91.6,89.8,88.2,86.8,85.2,84.0,83.1,82.0,86.8,89.2,91.0,96.0,98.5,99.4,99.1,98.5,97.2,96.2,95.1,94.4,93.4,92.1,91.0,89.9,89.0,87.4,85.8,84.2,83.9,84.4,85.8,84.9,88.1,86.0,83.9,81.9,79.8,77.2,74.8,72.5,70.2,68.2,66.4,64.6,63.0,61.5,60.1,58.9,57.8,56.6,55.8,68.5,87.9,95.4,98.1,99.2,99.6,100.0,100.0,100.2,100.2,100.2,100.4,98.4,96.4,94.5,94.8,93.8,94.6,95.2,95.0,94.8,94.1,94.8,92.6,89.8,87.0,84.2,82.4,80.1,78.2,76.6,75.6,74.5,73.5,72.9,72.2,71.5,70.9,70.8,70.2,69.8,69.6,69.8,69.1,68.8,68.8,70.6,71.9,73.1,74.1,74.0,79.4,84.0,84.5,87.0,85.2,87.5,85.9,88.0,87.2,88.0,86.6,87.1,95.4,98.2,98.1,97.5,95.9,94.4,93.5,92.4,89.5,86.8,84.9,84.5,84.5,85.2,85.6,85.8,84.4,82.9,81.5,82.4,83.1,81.6,82.1,82.4,82.8,82.8,82.2,80.9,79.4,78.1,76.9,75.8,74.8,73.9,73.0,73.0,72.6,73.0,72.2,74.8,73.5,72.9,71.9,71.1,70.4,69.6,69.4,69.4,71.2,70.6,70.2,74.1,72.9,72.2,71.5,72.5,79.5,78.1,76.4,75.5,74.8,74.1,73.1,72.8,87.6,85.4,83.0,82.4,81.5,81.4,80.8,79.8,78.9,78.0,77.2,76.0,75.5,75.0,74.6,74.1,73.9,73.5,89.0,96.0,98.5,97.5,94.4,91.5,88.8,87.5,86.4,84.0,81.6,79.6,78.9,76.9,75.5,73.9,72.6,72.2,72.6,72.2,71.8,71.5,71.9,72.1,71.9,71.2,70.6,71.5,72.5,73.5,72.9,72.2,71.1,71.5,69.4,67.2,65.4,63.6,62.0,60.5,59.1,57.9,57.0,59.8,61.1,61.5,61.9,62.1,62.2,65.6,67.2,67.8,68.1,88.4,95.8,98.4,99.4,99.9,99.5,96.0,94.1,93.6,93.1,92.8,92.4,92.1,91.8,91.5,91.2,91.2,91.0,91.1,89.9,87.9,86.1,84.6,83.0,81.9,80.6,79.8,78.6,78.0,78.0,86.5,91.2,90.0,88.6,88.1,87.8,87.2,87.0,87.4,86.4,86.6,92.6,93.6,92.2,90.4,88.6,86.9,86.2,86.2,85.8,86.4,85.9,85.5,85.1,86.4,88.5,87.9,87.2,86.8,86.2,85.8,85.2,88.5,92.6,92.4,91.4,89.6,88.6,87.5,85.8,84.4,82.8,80.4,77.6],"cpu_mhz":[3063,2122,2320,2759,2312,2553,2534,2557,2380,2734,2651,2507,2527,2661,3069,2433,2476,2581,2428,2502,3043,3394,2691,3045,2636,3210,2638,2497,3077,2654,2381,3018,2721,2517,3440,2366,2527,2935,3685,2983,2924,3014,3387,2808,2674,2733,3862,4167,3049,2690,2556,3029,2982,3456,3160,2614,2644,3023,2705,2548,3262,2750,3352,3194,2791,3131,2961,3014,2366,2432,2609,2263,3559,3088,2867,2854,2870,2382,2433,2405,2701,2816,3138,2367,2231,2322,2432,2316,2807,3301,2945,3675,2455,2659,2498,2447,3505,3393,2899,2622,2718,2892,2214,3167,3005,3045,2956,3682,2048,2241,2782,2679,2184,2907,2639,2316,3128,3096,3565,3231,3465,3035,3042,2900,2292,2679,3070,2244,2078,2306,2762,2517,2787,2510,2433,2730,1993,2027,1843,1856,1768,2305,1593,1842,1496,1692,1674,1673,1563,1587,1645,1615,1647,1661,1873,2267,2272,2603,2184,2267,2238,2625,2613,2482,2180,2579,2595,2495,2385,2703,2326,2543,3187,2087,2486,2581,2407,2312,2829,2367,2341,2253,2551,2315,2312,2336,2256,2465,2295,2317,2525,2366,2566,2421,2366,2524,2547,2698,2508,2186,2343,2566,2101,2370,2560,2107,2840,2372,2517,2538,2520,2533,2504,2309,3047,2329,2433,2653,2555,2642,2724,2451,2230,2473,2628,2160,2705,2764,2979,2982,3298,3868,2526,2082,2311,2882,2210,2333,2040,2225,2537,2472,2747,2844,2596,2174,2302,2077,2280,2120,2641,2732,2614,2740,2592,2513,2413,2579,2827,2554,2505,3040,2710,2548,2776,2741,2654,2729,2449,2554,2491,2507,2489,2474,2342,2302,2209,2276,2498,2369,2349,2307,2362,2648,2783,3616,4183,2830,3194,2532,2854,2781,2244,2169,2028,2319,2694,2351,2746,2752,3270,2649,2577,2552,2783,2379,2003,2481,2739,2475,2577,3059,2385,2330,1830,3018,2316,2657,2975,2819,2309,2541,2681,2296,2350,2324,2364,2314,2156,2299,2641,2171,2813,2095,1612,1669,1725,1614,2169,1981,1730,1732,1803,3021,2698,2917,2124,2515,2805,2611,3064,2705,2694,2682,2569,2407,2130,2630,2394,2295,2233,2438,2575,2654,2362,2532,2400,2216,2812,2294,2738,2753,2722,2839,2515,2581,2209,2376,2852,3063,3160,2311,2869,3044,2887,2733,4238,3021,2983,2923,2869,2678,3018,2428,2305,2599,2343,3003,2352,2774,3159,2828,2943,2989,2429,2783,2691,2659,3238,2520,2172,2468,2289,2314,3175,3680,3069,3018,2784,3385,2336,2995,2504,2522,2767,1824,1953],"gpu_busy":[2,3,1,2,1,2,3,2,1,2,3,1,1,2,2,3,2,0,2,1,1,2,2,4,4,5,3,3,2,3,4,4,3,2,5,2,4,2,1,1,0,3,1,3,1,0,0,2,4,3,10,4,3,2,3,2,2,2,4,3,2,3,3,3,2,3,3,3,2,4,65,69,42,25,13,6,4,3,3,3,3,2,3,2,2,2,2,2,2,4,4,4,3,3,3,2,3,3,3,2,3,3,2,2,2,2,3,2,2,2,2,2,3,2,3,3,3,4,5,5,6,5,7,6,6,4,3,3,3,4,4,3,4,4,4,3,29,58,74,37,19,7,2,2,0,0,0,0,0,0,0,0,0,0,0,2,1,0,1,2,0,2,0,1,1,2,1,2,0,1,2,1,1,1,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,2,0,0,0,0,0,0,1,1,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,2,0,2,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,1,1,1,0,2,3,1,2,1,0,0,1,1,1,0,0,0,0,0,0,1,4,6,5,4,3,3,3,3,3,3,3,3,2,2,2,3,3,3,2,2,2,2,2,24,32,37,18,11,16,19,22,24,10,5,4,2,3,4,4,3,2,3,2,2,4,2,4,4,3,2,2,2,2,1,1,1,1,3,2,2,3,2,2,4,4,4,3,4,3,3,3,3,4,3,3,3,4,3,2,2,2,2,2,2,2,1,3,2,3,3,2,2,2,3,3,3,4,4,5,5,6,7,7,7,6,6,4,3,2,4,2,3,2,2,4,3,2,2,3,2,3,3,3,2,3,2,2,2,2,1,2,3,60,50,77,49,25,17,19,7,3],"ram":[3.77,3.86,3.87,3.87,3.87,3.87,3.86,3.86,3.86,3.86,3.86,3.85,4.22,4.15,4.15,4.15,4.15,4.15,4.15,4.15,4.15,4.15,4.15,4.05,4.08,4.08,4.08,4.08,4.09,4.09,4.08,4.28,4.41,4.41,4.21,4.21,4.19,4.19,4.17,4.41,4.41,4.4,4.37,6.07,5.13,7.07,7.07,6.99,5.92,6.47,6.47,6.47,4.57,5.15,6.24,7.97,5.46,7.93,10.44,11.99,4.96,7.08,9.57,11.53,14.05,16.55,19.07,20.01,19.31,4.42,4.42,4.73,4.53,5.92,4.61,4.59,4.57,4.56,4.54,4.52,4.5,4.49,4.47,4.46,4.44,4.42,4.4,4.39,4.37,4.36,4.35,4.33,4.32,4.31,4.29,4.28,4.26,4.25,4.23,4.21,4.74,4.7,4.62,4.59,4.82,4.83,4.55,4.61,4.67,4.66,4.74,4.89,4.38,4.37,4.37,4.35,4.33,4.33,4.32,4.33,4.68,4.74,4.68,4.66,6.15,7.54,8.25,8.1,7.55,7.46,7.14,7.11,6.18,10.95,9.88,20.32,4.83,4.78,4.77,5.7,4.47,4.46,4.44,4.33,4.27,4.25,4.21,4.14,4.15,4.05,4.05,3.98,3.97,3.97,3.9,3.99,3.99,3.95,3.95,3.95,3.92,3.92,3.92,3.92,3.92,3.92,3.92,5.05,5.05,5.05,5.37,5.02,4.9,4.84,4.77,4.75,4.43,4.62,4.61,4.67,4.68,4.7,4.82,4.8,4.79,4.79,4.78,4.77,4.76,4.76,4.71,4.71,4.7,4.7,4.69,4.68,4.67,4.65,4.63,4.63,4.63,4.7,4.75,4.73,4.72,4.72,4.67,4.67,4.62,4.62,4.57,4.57,4.56,4.49,4.49,4.45,4.44,4.39,4.39,4.39,4.38,4.38,4.38,4.38,4.37,4.38,4.63,4.75,4.97,5.01,4.97,4.94,4.91,4.78,5.58,6.08,6.11,7.01,7.01,6.89,6.17,6.03,6.94,6.94,6.33,6.33,7.33,7.32,7.32,7.32,7.32,7.32,5.41,6.86,6.9,8.37,8.69,7.98,8.3,7.17,7.1,7.02,7.07,7.07,7.13,5.57,4.87,6.13,7.29,6.7,4.8,6.75,8.29,10.3,10.3,4.75,5.36,7.87,9.96,12.31,13.76,16.15,16.33,16.33,14.71,4.76,5.46,7.82,10.24,12.77,15.31,17.86,20.36,21.62,24.04,26.45,28.86,31.28,33.69,36.11,36.36,36.36,36.36,36.36,36.36,36.36,36.1,21.29,5.86,4.77,4.76,4.74,6.03,5.11,5.1,5.07,5.06,5.54,5.88,5.81,5.81,5.77,4.82,5.53,5.82,5.85,5.43,6.34,5.77,6.35,5.87,7.29,6.28,5.19,5.17,5.15,5.12,5.1,5.07,5.05,5.04,5.02,5.0,4.98,4.96,4.94,4.92,4.9,4.88,4.85,4.83,4.81,4.79,4.77,4.75,4.72,4.69,4.67,4.73,4.72,4.36,4.36,4.5,4.49,4.63,4.62,4.63,4.63,4.62,4.62,4.6,4.59,4.24,4.45,4.39,4.37,4.37,4.35,4.37,4.29,4.35,4.27,4.34,4.55,4.51,4.45,4.44,4.66,4.64,4.62,4.59,6.12,7.22,6.67,6.96,5.95,6.67,6.65,6.63,6.61,4.68,5.24,6.64,8.27,5.73,8.2,10.69,12.19,5.12,6.64,9.1,11.6,14.09,16.6,19.1,20.1,20.09,5.91,4.73,5.59,4.64,6.1,6.08,5.67,6.04,4.45,4.43]},"system":{"vendor":"Dell Inc.","product":"Inspiron 14 7425 2-in-1","chassis":"laptop","cpu":"AMD Ryzen 5 5625U with Radeon Graphics","cpu_max_mhz":"4390","physical_cores":"6","logical_cpus":"12","ram_gib":"61.2","ram_type":"DDR4","ram_speed_mts":"3200","ram_modules":"2","ram_module_sizes_gib":"32 32","gpus":"Advanced Micro Devices, Inc. [AMD/ATI] Barcelo (rev c2)","os":"Ubuntu 26.04.1 LTS","kernel":"7.0.0-34-generic","power":"AC","platform_profile":"balanced","suite_tests_sha":"96c2e949ae9d"},"version_labels":{"C++":"g++ 15.2.0, -O3","Python":"CPython 3.14.7 + NumPy 2.5.3","R":"R 4.5.2","JavaScript":"Node.js v24.21.0"},"newest_batch":{"C++":"20261001-135441","Python":"20261001-135441","R":"20261001-135441","JavaScript":"20261001-135441"},"T":{"kind":"laptop","machine_name":"Dell Inspiron 14 7425 2-in-1","os_family":"Linux","switch_label":"Dell Inspiron 14 7425 2-in-1 · Linux","runs_text":"three full runs","spread_text":"typically 1.2% between runs","date_text":"1 October 2026","minutes_text":"A full run took about 7 minutes on this laptop.","cores_text":"The same Mandelbrot work split across 1 to 12 workers. The CPU has 6 physical cores and 12 hardware threads. C++ and JavaScript run their workers as threads; Python and R start separate processes.","mem_text":"Bandwidth against the memory's theoretical peak of 51.2 GB/s (DDR4-3200, two channels). Python and R work on one core; C++ also runs the triad on all cores.","gpu_title":"GPU (AMD Radeon Graphics, 7 compute units)","gpu_text":"C++, Python and R run identical OpenCL kernels; JavaScript runs a line-by-line WebGPU translation (Vulkan underneath). Once a kernel runs, the language barely matters. Moving data does: R has no 32-bit number type and converts every value, so its uploads are 10× slower than C++'s here. This GPU shares the system RAM.","peak_text":"Best measured rate as a share of the theoretical peak. The CPU peak assumes all 6 cores at full boost (4.4 GHz), which few laptops hold under sustained load; matrix multiply goes through OpenBLAS in every language.","heat_title":"Heat and clock speed during a run","heat_text":"One full run, sampled every second. The CPU peaked at 100 °C, and while the benchmark ran the average clock across all cores was 2.6 GHz against a 4.4 GHz maximum.","power_text":"The laptop was on AC power with the balanced power profile.","cool_text":"Before each language, the runner waits for the CPU to cool below 60 °C.","alloc_note":"NumPy asks Linux for 2 MB memory pages for big arrays, which cuts the number of page faults when new memory is first touched; the other languages use normal 4 KB pages.","runs_label":"three full runs, AC power, balanced profile","spec":[["Machine","Dell Inspiron 14 7425 2-in-1"],["CPU","AMD Ryzen 5 5625U · 6 cores / 12 threads · up to 4.4 GHz"],["Memory","2 × 32 GB DDR4-3200, two channels (51.2 GB/s peak)"],["GPU","AMD Radeon Graphics · 7 compute units · 1.8 GHz"],["System","Ubuntu 26.04.1 LTS · Linux 7.0.0"],["Runs","three full runs, AC power, balanced profile"]],"verify_badge":"All four languages computed identical answers on all 18 tests","verify_text":"A verify mode runs tiny identical inputs and checks that all languages produce the same answers; on this laptop they agree on all 18 tests, to the last digit for integer results.","findings":"<li style=\"--k: var(--c-js)\"><span><b>JavaScript: 0.75× of C++ speed overall.<\/b> Beats C++ on <span class=\"mono\">mem_alloc<\/span> (1.1×) and falls furthest behind on <span class=\"mono\">fib_recursive<\/span> (0.13×, 8× slower). Plain loops run at 0.51× of C++ and library or vectorized code at 0.78×.<\/span><\/li>\n<li style=\"--k: var(--c-py)\"><span><b>Python: 0.42× of C++ speed overall.<\/b> Beats C++ on <span class=\"mono\">sort<\/span> (7.4×) and falls furthest behind on <span class=\"mono\">fib_recursive<\/span> (0.013×, 75× slower). Plain loops run at 0.026× of C++ and library or vectorized code at 1.1×.<\/span><\/li>\n<li style=\"--k: var(--c-r)\"><span><b>R: 0.17× of C++ speed overall.<\/b> Beats C++ on <span class=\"mono\">sort<\/span> (1.3×) and falls furthest behind on <span class=\"mono\">fib_recursive<\/span> (0.0017×, 573× slower). Plain loops run at 0.013× of C++ and library or vectorized code at 0.3×.<\/span><\/li>\n<li><span><b>All cores:<\/b> the best parallel speedups are C++ 9.3×, JavaScript 8×, Python 5.4×, R 4×, on 6 physical cores.<\/span><\/li>\n<li><span><b>The hardware sets the ceiling:<\/b> matrix multiply reaches 231 GFLOP/s at best (55% of the CPU's theoretical peak); GPU compute reaches 798 GFLOP/s (50% of its peak), about the same from every language.<\/span><\/li>"}},{"id":"alienware-m16-r1","langs":["C++","Python","R","JavaScript"],"categories":{"cpu_single":{"C++":1.0,"Python":0.18975816106023716,"R":0.07614902503009387,"JavaScript":0.5906905545036367},"cpu_multi":{"C++":1.0,"Python":0.10979274937451641,"R":0.016455796398451447,"JavaScript":0.9694243653337928},"ram":{"C++":1.0,"Python":0.6504289273600823,"R":0.469347140293568,"JavaScript":0.9721823705148116},"gpu":{"C++":1.0,"Python":1.006638470906734,"R":0.2175576489940587,"JavaScript":0.6022123547265472}},"overall":{"C++":1.0,"Python":0.341752636637928,"R":0.10635623291203629,"JavaScript":0.7609267292362608},"tests":[{"test":"scalar_loop","category":"cpu_single","style":"loop","unit":"M iter/s","rate":{"C++":658.6929,"Python":22.8414,"R":53.5564,"JavaScript":769.6729},"range":{"C++":[434.6281,827.1976,3],"Python":[13.2093,27.1813,3],"R":[26.81,53.5564,3],"JavaScript":[745.1012,838.003,3]}},{"test":"mandelbrot","category":"cpu_single","style":"loop","unit":"M px/s","rate":{"C++":14.664,"Python":0.4356,"R":0.4417,"JavaScript":15.8088},"range":{"C++":[10.4665,18.1901,3],"Python":[0.2455,0.4754,3],"R":[0.2253,0.4417,3],"JavaScript":[15.2849,16.9247,3]}},{"test":"fib_recursive","category":"cpu_single","style":"loop","unit":"M calls/s","rate":{"C++":2419.8329,"Python":37.6412,"R":7.0903,"JavaScript":457.3294},"range":{"C++":[1758.27,2919.8623,3],"Python":[18.1262,39.2724,3],"R":[3.2327,7.0903,3],"JavaScript":[420.2735,477.8351,3]}},{"test":"vector_math","category":"cpu_single","style":"vectorized","unit":"M elem/s","rate":{"C++":692.6023,"Python":180.2516,"R":219.9485,"JavaScript":272.9045},"range":{"C++":[475.0291,788.3302,3],"Python":[90.3515,182.5469,3],"R":[147.8331,219.9485,3],"JavaScript":[236.262,272.9045,3]}},{"test":"sort","category":"cpu_single","style":"builtin","unit":"M items/s","rate":{"C++":14.5821,"Python":91.6746,"R":22.2218,"JavaScript":7.4366},"range":{"C++":[8.8855,17.0681,3],"Python":[39.1264,97.3289,3],"R":[13.6984,22.2218,3],"JavaScript":[6.7782,7.8056,3]}},{"test":"hashmap","category":"cpu_single","style":"builtin","unit":"M ops/s","rate":{"C++":7.8133,"Python":8.9892,"R":0.3954,"JavaScript":12.2968},"range":{"C++":[5.9323,9.495,3],"Python":[5.0626,9.5369,3],"R":[0.2033,0.3954,3],"JavaScript":[9.301,12.2968,3]}},{"test":"string_ops","category":"cpu_single","style":"builtin","unit":"M items/s","rate":{"C++":15.6603,"Python":4.5997,"R":1.323,"JavaScript":5.2188},"range":{"C++":[10.9197,19.8439,3],"Python":[2.5934,4.8564,3],"R":[0.7274,1.323,3],"JavaScript":[4.5951,5.4488,3]}},{"test":"parallel_mandelbrot","category":"cpu_multi","style":"parallel","unit":"M px/s","rate":{"C++":239.4784,"Python":2.6683,"R":5.2061,"JavaScript":170.5144},"range":{"C++":[140.2309,276.0946,3],"Python":[1.4407,2.6683,3],"R":[3.3257,5.2061,3],"JavaScript":[163.1624,184.7161,3]}},{"test":"matmul_blas","category":"cpu_multi","style":"blas","unit":"GFLOP/s","rate":{"C++":310.4055,"Python":335.8241,"R":3.8665,"JavaScript":409.6967},"range":{"C++":[112.8034,412.7629,3],"Python":[140.1809,335.9454,3],"R":[3.6923,3.8665,3],"JavaScript":[329.575,410.5602,3]}},{"test":"mem_copy","category":"ram","style":"builtin","unit":"GB/s","rate":{"C++":29.9319,"Python":36.7486,"R":8.4501,"JavaScript":35.1231},"range":{"C++":[26.0062,35.8476,3],"Python":[27.6533,37.5627,3],"R":[7.779,8.4501,3],"JavaScript":[28.0238,36.9891,3]}},{"test":"mem_triad","category":"ram","style":"vectorized","unit":"GB/s","rate":{"C++":54.9808,"Python":6.6137,"R":12.0222,"JavaScript":25.7634},"range":{"C++":[53.5247,60.4559,3],"Python":[4.4147,6.7895,3],"R":[11.3701,12.0222,3],"JavaScript":[22.1569,25.7634,3]}},{"test":"mem_gather","category":"ram","style":"vectorized","unit":"M accesses/s","rate":{"C++":75.4731,"Python":82.7325,"R":82.5759,"JavaScript":104.9536},"range":{"C++":[62.3361,101.8086,3],"Python":[58.7106,82.7965,3],"R":[77.6222,82.5759,3],"JavaScript":[93.5136,111.1776,3]}},{"test":"mem_alloc","category":"ram","style":"builtin","unit":"GB/s","rate":{"C++":6.687,"Python":7.3928,"R":4.8045,"JavaScript":7.8121},"range":{"C++":[5.5261,8.4488,3],"Python":[5.358,7.3928,3],"R":[4.3179,4.8045,3],"JavaScript":[6.8184,8.2146,3]}},{"test":"gpu_fp32_peak","category":"gpu","style":"gpu","unit":"GFLOP/s","rate":{"C++":41824.3369,"Python":40575.9775,"R":31566.1347,"JavaScript":20781.5761},"range":{"C++":[40328.3314,42347.5438,3],"Python":[40575.9775,41664.5814,3],"R":[30400.8413,32096.9238,3],"JavaScript":[20781.5761,21619.7564,3]}},{"test":"gpu_bandwidth","category":"gpu","style":"gpu","unit":"GB/s","rate":{"C++":503.3243,"Python":470.9394,"R":70.6225,"JavaScript":455.2261},"range":{"C++":[492.3614,503.3243,3],"Python":[454.3208,482.7108,3],"R":[46.7309,70.6225,3],"JavaScript":[433.205,455.2261,3]}},{"test":"gpu_sgemm","category":"gpu","style":"gpu","unit":"GFLOP/s","rate":{"C++":7286.707,"Python":6974.048,"R":1593.6657,"JavaScript":5367.535},"range":{"C++":[7258.384,7303.4346,3],"Python":[6570.9961,7065.5436,3],"R":[1214.8087,2244.2954,3],"JavaScript":[4675.3032,5367.535,3]}},{"test":"gpu_upload","category":"gpu","style":"gpu","unit":"GB/s","rate":{"C++":10.4092,"Python":11.0331,"R":2.5366,"JavaScript":3.4609},"range":{"C++":[9.4307,11.1999,3],"Python":[9.5049,11.0331,3],"R":[2.0336,2.8537,3],"JavaScript":[3.2666,3.5383,3]}},{"test":"gpu_download","category":"gpu","style":"gpu","unit":"GB/s","rate":{"C++":10.3215,"Python":11.5856,"R":0.8913,"JavaScript":7.4275},"range":{"C++":[10.3215,12.2297,3],"Python":[7.3878,12.101,3],"R":[0.8525,0.8954,3],"JavaScript":[6.9078,7.6055,3]}}],"workers":[1,2,4,8,24,32],"parallel":{"C++":[1.0,1.98,3.74,6.57,14.87,15.53],"Python":[1.0,1.87,3.24,5.22,6.07,5.9],"R":[1.0,1.89,3.47,6.31,12.55,12.2],"JavaScript":[1.0,1.82,3.38,6.06,10.54,9.23]},"triad":{"1":{"C++":24.55,"JavaScript":25.76,"Python":6.61,"R":12.02},"24":{"C++":54.6},"32":{"C++":54.98}},"alloc_sizes":[1.0,2.0,4.0,8.0],"alloc":{"C++":[6.69,6.61,6.35,6.58],"Python":[7.27,7.39,7.14,7.19],"R":[4.8,3.51,3.44,3.58],"JavaScript":[6.39,7.37,7.81,7.28]},"alloc_seconds":{"C++":[0.32,0.65,1.35,2.61],"Python":[0.3,0.58,1.2,2.39],"R":[0.45,1.23,2.5,4.8],"JavaScript":[0.34,0.58,1.1,2.36]},"peaks":{"cpu_fp64":1173.5,"ram":83.2,"gpu_fp32":46986.2,"gpu_mem":576.1},"util":[{"name":"CPU compute (FP64 matrix multiply)","peak":1173.5,"unit":"GFLOP/s","pct":{"C++":26.5,"Python":28.6,"R":0.3,"JavaScript":34.9}},{"name":"RAM bandwidth (copy or triad, one core)","peak":83.2,"unit":"GB/s","pct":{"C++":66.1,"Python":44.2,"R":14.4,"JavaScript":42.2}},{"name":"GPU compute (FP32 peak kernel)","peak":46986.2,"unit":"GFLOP/s","pct":{"C++":89.0,"Python":86.4,"R":67.2,"JavaScript":44.2}},{"name":"GPU memory bandwidth","peak":576.1,"unit":"GB/s","pct":{"C++":87.4,"Python":81.7,"R":12.3,"JavaScript":79.0}}],"sensors":{"batch":"20261001-205732","t":[0.0,1.1,2.2,3.2,4.3,5.4,6.4,7.5,8.5,9.5,10.6,11.7,12.7,13.8,14.8,15.9,17.0,18.0,19.1,20.1,21.1,22.2,23.3,24.3,25.4,26.4,27.5,28.5,29.6,30.6,31.7,32.8,34.0,35.1,36.2,37.3,38.5,39.5,40.6,41.6,42.7,43.7,44.8,45.9,46.9,48.0,49.0,50.1,51.1,52.2,53.2,54.3,55.3,56.4,57.5,58.5,59.6,60.6,61.7,62.7,63.8,64.8,65.8,66.9,67.9,69.0,70.0,71.1,72.1,73.2,74.2,75.2,76.3,77.3,78.4,79.5,80.5,81.6,82.6,83.7,84.7,85.8,86.9,87.9,89.0,90.0,91.1,92.1,93.2,94.2,95.3,96.3,97.4,98.4,99.5,100.5,101.6,102.7,103.7,104.7,105.8,106.9,107.9,109.0,110.0,111.0,112.1,113.2,114.2,115.3,116.4,117.5,118.6,119.6,120.7,121.7,122.8,123.8,124.9,125.9,127.0,128.0,129.1,130.1,131.2,132.2,133.3,134.3,135.4,136.4,137.5,138.5,139.6,140.6,141.7,142.7,143.8,144.8,145.9,146.9,148.0,149.1,150.1,151.2,152.2,153.2,154.3,155.4,156.4,157.5,158.5,159.6,160.7,161.7,162.8,163.8,164.8,165.9,167.0,168.0,169.1,170.1,171.1,172.2,173.2,174.3,175.3,176.4,177.4,178.5,179.5,180.6,181.7,182.7,183.7,184.8,185.8,186.9,187.9,189.0,190.0,191.1,192.1,193.2,194.2,195.3,196.3,197.4,198.4,199.5,200.5,201.6,202.6,203.7,204.7,205.8,206.8,207.9,208.9,210.0,211.0,212.1,213.1,214.2,215.2,216.3,217.3,218.4,219.4,220.5,221.5,222.6,223.6,224.7,225.7,226.8,227.8,228.9,229.9,231.0,232.0,233.1,234.1,235.2,236.2,237.3,238.3,239.4,240.4,241.5,242.5,243.5,244.6,245.7,246.7,247.8,248.8,249.9,250.9,252.0,253.0,254.1,255.1,256.2,257.2,258.3,259.3,260.4,261.4,262.5,263.5,264.6,265.6,266.7,267.7,268.8,269.8,270.9,271.9,273.0,274.0,275.1,276.1,277.2,278.2,279.3,280.3,281.4,282.4,283.5,284.5,285.6,286.6,287.7,288.7,289.8,290.8,291.9,293.0,294.0,295.1,296.1,297.2,298.2,299.3,300.3,301.4,302.4,303.5,304.5,305.5,306.6,307.7,308.7,309.8,310.8,311.8,312.9,314.0,315.0,316.0,317.1,318.1,319.2,320.2,321.3,322.4,323.4,324.5,325.5,326.6,327.6,328.7,329.7,330.7,331.8,332.8,333.9,334.9,336.0,337.0,338.1,339.1,340.2,341.2,342.3,343.3,344.4,345.4,346.5,347.5,348.6,349.6,350.7,351.7,352.8,353.9,354.9,356.0,357.0,358.1,359.2,360.3,361.3,362.4,363.4,364.5,365.5,366.6,367.6,368.7,369.7,370.8,371.8,372.9,373.9,375.0,376.0,377.0,378.1,379.1,380.2,381.2,382.3,383.3,384.4,385.5,386.5,387.6,388.6,389.7,390.7,391.8,392.8,393.9,394.9,396.0,397.0,398.0,399.1,400.1,401.2,402.2,403.3,404.3,405.4,406.5,407.5,408.5,409.6,410.6,411.7,412.7,413.8,414.8,415.9,416.9,418.0,419.0,420.1,421.1,422.2,423.2,424.3,425.3,426.4,427.4,428.5,429.5,430.6,431.6,432.7,433.7,434.8,435.8,436.9,437.9,439.0,440.0,441.1,442.2,443.2,444.2,445.3,446.4,447.4,448.5,449.5,450.5,451.6,452.7,453.7,454.8,455.8,456.9,457.9,459.0,460.0,461.1,462.1,463.2,464.2,465.2,466.3,467.4,468.4,469.5,470.5,471.6,472.6,473.7,474.7,475.7,476.8,477.8,478.8,479.9,481.0,482.0,483.1,484.1,485.2,486.3,487.3,488.4,489.4,490.4,491.5,492.6,493.6,494.7,495.7,496.8,497.8,498.9,499.9,501.0,502.0,503.1,504.1,505.2,506.3,507.3,508.4,509.4,510.5,511.5,512.5,513.6,514.6,515.7,516.7,517.8,518.8,519.9,520.9,522.0,523.0,524.1,525.1,526.2,527.2,528.3,529.3,530.4,531.4,532.5,533.5,534.5,535.6,536.6,537.7,538.7,539.8,540.8,541.9,542.9,544.0,545.0,546.0,547.1,548.2,549.2,550.3,551.3,552.4,553.4,554.5,555.5,556.6,557.6,558.7,559.9,561.1,562.1,563.2,564.2,565.3,566.3,567.4,568.4,569.5,570.5,571.6,572.6,573.7,574.7,575.7,576.8,577.8],"phase":["cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","cpp","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","python","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","idle","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","js","idle"],"cpu_temp":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"cpu_mhz":[2762,3175,3424,2985,2814,2896,3041,2775,3073,3024,2726,2861,3004,2971,2995,3140,3192,2890,2962,2755,2561,2768,3222,3330,2954,3409,3458,3002,3639,3585,3645,3202,3083,3051,3022,3601,3712,2908,2815,2952,2743,3598,3257,3386,3468,3084,3320,3244,2832,2975,2689,3126,2917,2778,3421,3268,3231,3007,2605,3242,2434,2965,3332,3320,2840,2679,2676,2636,2517,2710,2673,2613,2665,2674,2636,2656,2622,2622,2757,2833,2762,2701,2898,2912,2760,2339,2461,2432,2504,2538,2490,2440,2743,2629,2595,2811,3107,3179,3184,3214,3065,2472,2924,2873,2749,2966,2951,3238,3281,3060,3055,2945,2633,2678,2740,2659,2652,2751,2741,2915,2791,2457,3371,2998,3373,3838,3938,3958,3675,4260,3637,2572,2776,2869,2348,3086,2847,2078,2043,2282,2218,1737,2861,2134,2201,2214,2038,2229,2191,2106,2172,1785,1972,2259,2277,2112,2118,2203,2337,2244,3153,1976,2671,4127,3776,3761,3128,3472,3392,3485,3693,3355,2550,4340,3626,3902,4247,4276,4651,4225,3785,4073,2808,4103,3955,4386,4063,4368,4006,3917,4134,4598,2674,4282,4074,3629,3506,3842,3874,3438,3915,3920,2715,3088,2826,2743,2981,3082,2981,3275,3467,3440,2675,2843,3195,3777,3988,3515,4325,4103,3738,4137,3098,2924,3935,3326,3540,3461,3986,4085,4348,4432,3673,2676,4074,4121,4218,4327,4137,4325,4477,4290,3970,2599,4215,4258,4468,4038,4181,4328,4488,4223,4379,2693,4084,3582,3555,3749,4127,3824,4059,3974,4056,2749,3925,3934,4201,3829,3870,4004,3628,4437,4352,2580,3866,4405,4421,4474,3857,4337,4190,4465,4217,2749,3193,3718,4024,3835,3518,4059,4257,4498,4468,2933,3019,4145,4050,3871,3900,3661,4114,3862,3634,2825,3193,3745,3724,3780,3812,3802,3534,3237,3297,3376,2374,2948,2639,2824,2662,2685,2669,2727,2720,2766,2346,2768,2725,2824,2890,2882,2880,2854,2835,2616,2064,2180,2558,2770,2827,2823,2975,3014,2880,2808,2400,2848,3124,3013,2974,3631,4166,3576,3404,3489,2538,3033,4246,4294,4458,4477,4372,4302,3051,2975,2572,2636,2989,2869,2936,2978,3003,2938,3047,2736,2618,2378,2945,3057,2881,2640,2574,2821,3055,3023,2913,2373,2960,3075,2896,3070,3084,3262,3027,2889,3091,2461,3084,3299,3120,3677,4392,4411,4122,3389,3745,2499,3090,3223,3490,2925,3039,2890,3024,3026,3034,2657,3334,3900,3181,3343,3590,3816,3961,3631,3496,2914,2933,3757,3156,3675,4187,3174,2765,2924,2932,2921,2377,2869,2943,2925,2903,3192,3617,3064,2596,2596,2340,2594,2899,3186,3310,3247,3331,3327,3464,2913,2600,2615,2652,2606,2490,2699,2513,2589,2424,3622,2690,2927,2913,3184,2620,2374,2233,2173,2097,2103,1867,1958,2205,2257,2090,2338,2096,2118,2197,2564,2158,2273,2202,2231,2404,2364,2561,2551,2827,2870,2711,2603,2848,2834,2731,2609,2682,2571,2613,2910,2775,2357,2736,2812,2771,2756,2984,2822,3019,3176,3228,2591,3244,3211,3256,2934,2995,2922,3180,3263,3228,2512,3185,3057,3140,3424,3091,3086,2815,2982,3058,2473,3063,3014,2849,3047,3009,2998,3095,2568,3583,2499,3391,2838],"gpu_busy":[0,0,0,0,0,0,0,0,8,7,7,3,7,10,3,7,5,0,0,0,0,1,1,1,1,1,1,9,10,9,6,0,0,0,0,0,0,3,3,4,4,3,4,4,5,4,0,97,98,5,0,1,0,0,0,0,0,0,0,0,0,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,95,95,83,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,0,1,1,1,1,1,1,1,1,0,0,1,0,3,3,4,2,4,7,4,0,0,0,0,0,0,0,0,0,0,9,7,7,5,7,6,6,5,5,0,4,0,1,0,0,0,0,0,0,0,5,5,1,1,3,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,8,7,7,8,9,8,9,7,7,0,1,0,0,0,0,0,0,8,7,6,7,7,8,9,7,7,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,4,1,0,0,0,0,0,0,0,0,0,81,69,2,0,14,14,0,0,16,0,0,1,1,2,1,3,3,7,7,9,0,0,0,0,0,0,0,0,1,0,2,6,7,7,8,6,6,7,7,8,1,1,1,1,0,0,0,0,0,0,4,4,5,4,6,3,2,4,2,3,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8,0,0,0,0,1,1,1,1,1,1,94,75,46,43,53,0],"ram":[31.86,31.87,31.87,31.87,31.88,31.89,31.79,31.84,31.81,32.1,31.97,32.12,32.12,32.16,32.12,32.13,32.1,31.94,31.91,31.9,32.07,32.08,32.04,32.04,32.22,31.88,31.84,31.82,31.81,31.84,31.85,32.23,32.24,33.92,34.72,34.92,34.41,34.42,34.44,34.45,34.56,34.48,33.88,35.69,34.3,39.32,31.95,31.91,32.33,33.42,31.77,31.67,31.7,31.67,31.66,31.67,31.69,31.69,31.68,31.67,31.68,31.68,31.68,31.67,31.65,31.66,31.66,31.64,31.65,31.65,31.67,31.65,31.63,31.61,31.61,31.62,31.62,31.64,31.66,31.8,31.72,31.73,31.68,31.67,31.43,31.43,31.43,31.42,31.46,31.46,32.46,32.14,31.76,31.74,31.93,31.95,31.95,32.05,31.98,31.87,31.68,31.89,31.47,31.56,31.44,31.47,31.51,31.92,31.84,31.98,31.96,32.55,32.04,35.05,36.41,34.48,34.42,35.02,34.38,34.27,34.44,34.03,34.17,34.35,33.5,34.76,34.15,38.75,30.75,30.74,30.74,31.17,30.51,30.53,30.52,30.56,30.53,30.53,30.52,30.51,30.51,30.52,30.53,30.52,30.52,30.52,30.52,30.52,30.52,30.52,30.52,30.52,30.55,30.53,30.52,30.53,30.53,30.53,30.53,30.53,30.63,30.59,30.72,30.72,30.71,30.7,30.72,30.71,30.72,31.09,31.24,31.33,31.07,30.87,31.04,31.31,30.8,30.9,30.95,31.05,31.07,31.08,31.1,31.11,31.11,31.11,31.05,31.07,31.08,31.08,31.05,31.04,31.04,31.13,31.15,31.26,31.22,31.17,31.16,31.24,31.18,31.24,31.24,31.34,31.25,31.4,31.13,31.17,31.09,31.29,30.9,31.03,31.27,31.13,31.14,31.13,31.14,31.15,31.16,31.12,31.15,31.16,31.18,31.31,31.68,31.17,31.16,31.16,31.17,31.17,31.18,31.18,31.19,31.19,31.19,31.22,31.22,31.22,31.23,31.23,31.23,31.24,31.24,31.25,31.25,31.27,31.15,31.17,31.18,31.17,31.17,31.17,31.18,31.22,31.21,31.22,31.23,31.24,31.25,31.23,31.24,31.27,31.28,31.28,31.29,31.58,32.01,32.21,31.26,31.27,31.26,31.27,31.27,31.26,31.27,31.28,31.28,31.29,31.28,31.28,31.16,31.16,31.17,31.18,31.17,31.18,31.18,31.19,31.21,31.21,31.21,31.2,31.21,31.23,31.26,31.27,31.26,31.29,31.27,31.35,31.34,31.37,31.51,31.96,32.01,32.04,32.04,32.05,32.03,32.03,32.03,32.05,32.06,32.07,32.09,31.97,31.96,31.96,31.97,31.96,31.96,31.97,31.98,31.98,32.01,32.0,32.0,32.0,32.03,32.01,32.01,32.01,32.02,32.05,32.01,32.01,32.02,32.03,32.04,32.05,32.06,32.04,32.05,32.09,32.1,32.11,32.11,32.13,32.14,32.07,33.09,32.03,32.03,32.04,32.07,32.08,32.08,32.08,32.08,32.08,32.08,32.06,32.07,32.07,32.08,32.08,32.09,31.99,31.97,31.94,31.95,31.95,31.96,31.96,31.97,31.98,31.98,31.99,31.99,31.99,32.01,32.02,32.03,31.91,31.92,31.93,31.93,31.93,31.94,31.94,31.97,31.96,31.96,31.96,31.98,31.99,32.0,32.0,31.99,32.01,32.01,32.02,32.02,32.03,32.04,32.04,32.03,32.06,32.04,32.04,32.03,32.05,32.04,32.04,32.05,32.07,32.08,33.2,33.34,34.27,33.43,34.28,33.39,34.22,34.14,33.95,33.81,34.82,35.84,35.1,35.84,34.58,34.59,34.58,34.57,34.55,34.65,33.37,33.91,31.89,34.63,37.92,31.9,34.51,39.46,42.44,43.89,43.81,31.79,31.8,31.8,32.43,31.8,32.02,31.83,33.27,32.76,32.75,33.11,32.76,32.74,31.74,31.75,31.37,31.37,31.36,31.34,31.34,31.44,31.36,31.37,31.37,31.37,31.37,31.37,31.37,31.37,31.35,31.36,31.36,31.36,31.36,31.36,31.36,31.36,31.38,31.35,31.36,31.39,31.45,31.47,31.48,31.63,31.59,31.58,31.58,31.57,31.58,31.57,31.57,31.57,31.57,31.55,31.55,31.55,31.92,31.84,31.86,32.05,32.02,32.02,32.18,32.16,32.15,32.19,32.22,32.28,32.3,32.28,32.32,32.16,31.86,31.77,31.83,31.91,31.91,31.85,31.74,31.74,31.69,31.76,32.12,32.11,33.75,34.6,33.17,33.86,33.89,33.89,33.89,33.63,35.63,34.96,39.65,30.79,30.87,30.93,31.7,31.35,30.64]},"system":{"vendor":"Alienware","product":"Alienware m16 R1","chassis":"laptop","cpu":"13th Gen Intel(R) Core(TM) i9-13900HX","cpu_max_mhz":"5283","physical_cores":"24","logical_cpus":"32","ram_gib":"63.7","ram_type":"DDR5","ram_speed_mts":"5200","ram_modules":"2","ram_module_sizes_gib":"32 32","gpus":"NVIDIA GeForce RTX 4090 Laptop GPU;Intel(R) UHD Graphics","os":"Windows 11 Home 25H2","kernel":"10.0.26200.9550","power":"AC","platform_profile":"balanced","suite_tests_sha":"96c2e949ae9d"},"version_labels":{"C++":"g++ 14.2.0, -O3","Python":"CPython 3.13.3 + NumPy 2.2.5","R":"R 4.5.2","JavaScript":"Node.js v22.14.0"},"newest_batch":{"C++":"20261001-205732","Python":"20261001-205732","R":"20261001-205732","JavaScript":"20261001-205732"},"T":{"kind":"laptop","machine_name":"Alienware m16 R1","os_family":"Windows","switch_label":"Alienware m16 R1 · Windows","runs_text":"three full runs","spread_text":"typically 16.2% between runs","date_text":"1 October 2026","minutes_text":"A full run took about 8 minutes on this laptop.","cores_text":"The same Mandelbrot work split across 1 to 32 workers. The CPU has 24 physical cores (8 performance and 16 efficiency cores) and 32 hardware threads. C++ and JavaScript run their workers as threads; Python and R start separate processes (on Windows both start them fresh, as Windows cannot fork).","mem_text":"Bandwidth against the memory's theoretical peak of 83.2 GB/s (DDR5-5200, two channels). Python and R work on one core; C++ also runs the triad on all cores.","gpu_title":"GPU (NVIDIA GeForce RTX 4090 Laptop GPU, 76 compute units)","gpu_text":"C++, Python and R run identical OpenCL kernels; JavaScript runs a line-by-line WebGPU translation (Direct3D 12 underneath on Windows). Once a kernel runs, the language barely matters. Moving data does: R has no 32-bit number type and converts every value, so its uploads are 4× slower than C++'s here. This GPU has its own memory, so uploads and downloads cross the PCIe bus.","peak_text":"Best measured rate as a share of the theoretical peak. The CPU peak assumes all 8 performance cores at 5.3 GHz and all 16 efficiency cores at 3.9 GHz (the highest clocks measured on one busy core of each type), which few laptops hold under sustained load; matrix multiply goes through OpenBLAS in every language except R, which on Windows uses its own reference BLAS.","heat_title":"Clock speed during a run","heat_text":"One full run, sampled every second. Windows lets no program read the CPU temperature without administrator rights, so this shows the clock only (Windows' effective-clock counter): while the benchmark ran the average clock across all cores was 3.3 GHz against a 5.3 GHz maximum.","power_text":"The laptop was on AC power with Windows' balanced power mode.","cool_text":"Windows lets no program read the CPU temperature without administrator rights, so the runner pauses 30 seconds before each language instead of waiting for the CPU to cool.","alloc_note":"Windows hands every language normal 4 KB pages (its large pages need a special privilege) and zeroes each page on first touch, so first use of new memory costs every language about the same.","runs_label":"three full runs, AC power, balanced mode","spec":[["Machine","Alienware m16 R1"],["CPU","13th Gen Intel(R) Core(TM) i9-13900HX · 24 cores (8 P + 16 E) / 32 threads · up to 5.3 GHz"],["Memory","2 × 32 GB DDR5-5200, two channels (83.2 GB/s peak)"],["GPU","NVIDIA GeForce RTX 4090 Laptop GPU · 76 compute units · 2.4 GHz"],["System","Windows 11 Home 25H2 · build 26200.9550"],["Runs","three full runs, AC power, balanced mode"]],"verify_badge":"All four languages computed identical answers on all 18 tests","verify_text":"A verify mode runs tiny identical inputs and checks that all languages produce the same answers; on this laptop they agree on all 18 tests, to the last digit for integer results.","findings":"<li style=\"--k: var(--c-js)\"><span><b>JavaScript: 0.76× of C++ speed overall.<\/b> Beats C++ on <span class=\"mono\">hashmap<\/span> (1.6×) and falls furthest behind on <span class=\"mono\">fib_recursive<\/span> (0.19×, 5× slower). Plain loops run at 0.62× of C++ and library or vectorized code at 0.79×.<\/span><\/li>\n<li style=\"--k: var(--c-py)\"><span><b>Python: 0.34× of C++ speed overall.<\/b> Beats C++ on <span class=\"mono\">sort<\/span> (6.3×) and falls furthest behind on <span class=\"mono\">parallel_mandelbrot<\/span> (0.011×, 90× slower). Plain loops run at 0.025× of C++ and library or vectorized code at 0.78×.<\/span><\/li>\n<li style=\"--k: var(--c-r)\"><span><b>R: 0.11× of C++ speed overall.<\/b> Beats C++ on <span class=\"mono\">sort<\/span> (1.5×) and falls furthest behind on <span class=\"mono\">fib_recursive<\/span> (0.0029×, 341× slower). Plain loops run at 0.019× of C++ and library or vectorized code at 0.22×.<\/span><\/li>\n<li><span><b>All cores:<\/b> the best parallel speedups are C++ 16×, R 13×, JavaScript 11×, Python 6.1×, on 24 physical cores.<\/span><\/li>\n<li><span><b>The hardware sets the ceiling:<\/b> matrix multiply reaches 410 GFLOP/s at best (35% of the CPU's theoretical peak); GPU compute reaches 41,824 GFLOP/s (89% of its peak), about the same from every language that uses OpenBLAS.<\/span><\/li>"}}],"default":"alienware-m16-r1","compare":{"base":"dell-inc-inspiron-14-7425-2-in-1","others":["alienware-m16-r1"],"langs":["C++","Python","R","JavaScript"],"tests":[{"test":"scalar_loop","category":"cpu_single","ratio":{"alienware-m16-r1":{"C++":1.3016,"Python":0.8743,"R":1.5027,"JavaScript":1.5235}}},{"test":"mandelbrot","category":"cpu_single","ratio":{"alienware-m16-r1":{"C++":0.9614,"Python":1.1229,"R":1.4997,"JavaScript":1.0389}}},{"test":"fib_recursive","category":"cpu_single","ratio":{"alienware-m16-r1":{"C++":0.93,"Python":1.0789,"R":1.5603,"JavaScript":1.3509}}},{"test":"vector_math","category":"cpu_single","ratio":{"alienware-m16-r1":{"C++":1.4426,"Python":0.5651,"R":1.8577,"JavaScript":1.3237}}},{"test":"sort","category":"cpu_single","ratio":{"alienware-m16-r1":{"C++":1.2285,"Python":1.0485,"R":1.3884,"JavaScript":0.7528}}},{"test":"hashmap","category":"cpu_single","ratio":{"alienware-m16-r1":{"C++":1.1357,"Python":1.2517,"R":1.3172,"JavaScript":1.8671}}},{"test":"string_ops","category":"cpu_single","ratio":{"alienware-m16-r1":{"C++":1.4703,"Python":1.1501,"R":1.1979,"JavaScript":0.8618}}},{"test":"parallel_mandelbrot","category":"cpu_multi","ratio":{"alienware-m16-r1":{"C++":1.6992,"Python":1.296,"R":4.4605,"JavaScript":1.404}}},{"test":"matmul_blas","category":"cpu_multi","ratio":{"alienware-m16-r1":{"C++":1.3771,"Python":1.6303,"R":0.0168,"JavaScript":1.8223}}},{"test":"mem_copy","category":"ram","ratio":{"alienware-m16-r1":{"C++":1.2214,"Python":1.4325,"R":1.7323,"JavaScript":1.4255}}},{"test":"mem_triad","category":"ram","ratio":{"alienware-m16-r1":{"C++":2.3093,"Python":0.4781,"R":2.3299,"JavaScript":1.5762}}},{"test":"mem_gather","category":"ram","ratio":{"alienware-m16-r1":{"C++":0.4947,"Python":0.7259,"R":1.0747,"JavaScript":0.935}}},{"test":"mem_alloc","category":"ram","ratio":{"alienware-m16-r1":{"C++":1.8003,"Python":0.4836,"R":2.1471,"JavaScript":1.8696}}},{"test":"gpu_fp32_peak","category":"gpu","ratio":{"alienware-m16-r1":{"C++":53.2281,"Python":52.389,"R":41.352,"JavaScript":26.0306}}},{"test":"gpu_bandwidth","category":"gpu","ratio":{"alienware-m16-r1":{"C++":12.2225,"Python":11.8754,"R":1.8473,"JavaScript":11.2916}}},{"test":"gpu_sgemm","category":"gpu","ratio":{"alienware-m16-r1":{"C++":59.6897,"Python":54.6694,"R":13.4796,"JavaScript":55.4287}}},{"test":"gpu_upload","category":"gpu","ratio":{"alienware-m16-r1":{"C++":0.7332,"Python":0.7328,"R":1.7038,"JavaScript":1.4896}}},{"test":"gpu_download","category":"gpu","ratio":{"alienware-m16-r1":{"C++":2.4889,"Python":3.4489,"R":2.3411,"JavaScript":1.7364}}}],"overall":{"alienware-m16-r1":{"C++":2.152052126525002,"Python":1.7662744483161932,"R":1.385962274776311,"JavaScript":2.1801121554501686}},"categories":{"alienware-m16-r1":{"cpu_single":{"C++":1.1932251607456343,"Python":0.9855948965021191,"R":1.4625122533868382,"JavaScript":1.1924574047780312},"cpu_multi":{"C++":1.5296555792761575,"Python":1.453544058052831,"R":0.2734715783023492,"JavaScript":1.599574092994013},"ram":{"C++":1.2589616574767524,"Python":0.7002419319145758,"R":1.7469591525038468,"JavaScript":1.4077730770042751},"gpu":{"C++":9.334317841180242,"Python":9.701926616770187,"R":5.280939299970155,"JavaScript":8.412701003100139}}},"text":{"h1":"Four languages, two laptops","names":{"dell-inc-inspiron-14-7425-2-in-1":"Dell Inspiron 14 7425 2-in-1","alienware-m16-r1":"Alienware m16 R1"},"lede":"The same 18 tests, written in C++, Python, R and JavaScript, run on two laptops — Dell Inspiron 14 7425 2-in-1 on Linux and Alienware m16 R1 on Windows — to see how each language uses a computer's CPU, memory and GPU.","compare_text":"How many times faster each language runs on the Alienware m16 R1 (Windows) than on the Dell Inspiron 14 7425 2-in-1 (Linux), test by test. Both ran the same version of the tests (suite 96c2e949ae9d). The differences come from the hardware - and, for a few tests, from the operating system and how each language is installed on it.","compare_findings":"<li><span><b>Overall<\/b>, the Alienware m16 R1 is 2.2× as fast for JavaScript, 2.2× as fast for C++, 1.8× as fast for Python, 1.4× as fast for R (geometric mean of the four hardware areas).<\/span><\/li>\n<li><span><b>GPU:<\/b> the NVIDIA GeForce RTX 4090 Laptop GPU runs the same kernels 9.3× as fast as the AMD Radeon Graphics (C++; averaged over the five GPU tests), the largest gap of any area.<\/span><\/li>\n<li><span><b>CPU:<\/b> one core is 1.2× as fast and all cores together 1.5× (C++), with 24 cores against 6.<\/span><\/li>\n<li><span><b>RAM:<\/b> 1.3× as fast for C++ (DDR5-5200 against DDR4-3200).<\/span><\/li>\n<li><span><b>R on <span class=\"mono\">matmul_blas<\/span>:<\/b> 0.017× as fast on the Alienware m16 R1, while C++ is 1.4× as fast. R for Windows ships a single-threaded reference BLAS, while R on Ubuntu uses the system OpenBLAS: that is the software, not the hardware.<\/span><\/li>\n<li><span><b>R on <span class=\"mono\">gpu_bandwidth<\/span>:<\/b> 1.8× as fast on the Alienware m16 R1, while C++ is 12× as fast.<\/span><\/li>\n<li><span><b>Python on <span class=\"mono\">mem_triad<\/span>:<\/b> 0.48× as fast on the Alienware m16 R1, while C++ is 2.3× as fast.<\/span><\/li>"}}}</script>
 <script>
 (() => {
-  const D = JSON.parse(document.getElementById("data").textContent);
-  const LANGS = D.langs;
+  const ALL = JSON.parse(document.getElementById("data").textContent);
+  const CMP = ALL.compare;
+  const BY_ID = Object.fromEntries(ALL.machines.map((m) => [m.id, m]));
+  let D = null, LANGS = [], S = null, T = null;     // the machine shown in the per-machine sections
   const KEY = { "C++": "cpp", "Python": "py", "R": "r", "JavaScript": "js" };
   const col = (l) => `var(--c-${KEY[l]})`;
   const CAT = { cpu_single: "CPU, one core", cpu_multi: "CPU, all cores", ram: "RAM", gpu: "GPU" };
@@ -324,6 +376,7 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
   const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
   const num = (v) => v == null ? "–" : (Math.abs(v) >= 1000 ? nf0.format(v) : nf3.format(v));
   const times = (v) => v == null ? "–" : (v >= 10 ? nf0.format(v) : new Intl.NumberFormat("en-US", { maximumSignificantDigits: 2 }).format(v)) + "×";
+  const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
 
   function svgEl(tag, attrs = {}, parent) {
     const e = document.createElementNS(NS, tag);
@@ -342,7 +395,7 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
     for (const l of langs) {
       const s = document.createElement("span");
       const i = document.createElement("i");
-      if (kind === "line") i.className = "line";
+      if (kind !== "bar") i.className = kind;
       i.style.background = col(l);
       s.append(i, document.createTextNode(l));
       box.appendChild(s);
@@ -425,25 +478,22 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
     return `M${x0},${y}H${x1 - r}Q${x1},${y} ${x1},${y + r}V${y + h - r}Q${x1},${y + h} ${x1 - r},${y + h}H${x0}Z`;
   }
 
-  // ---------------------------------------------------------------- grouped horizontal bars
-  // rows: [{label, sub, header?}], series: languages, get(row, lang) -> value
-  function hbars(id, o) {
+  // ---------------------------------------------------------------- row layout shared by bars and dots
+  // rows: [{label, sub, header?}]; returns the layout plus an svg with gridlines, ticks and refs drawn.
+  function rowFrame(id, o, rowHeight) {
     const box = document.getElementById(id);
     const W = Math.max(280, box.clientWidth);
     const narrow = W < 560;
     const labelW = o.labelW ? o.labelW(narrow) : (narrow ? 118 : 190);
     const right = narrow ? 52 : 70, top = 6, bottom = 30;
-    const barH = Math.min(o.barH || 9, 24), gap = 2;
-    const series = o.series;
-    const rows = o.rows;
     let y = top;
-    const layout = rows.map((r) => {
+    const layout = o.rows.map((r) => {
       if (r.header) { const at = y + (y > top ? 14 : 0); y = at + 24; return { r, y: at, header: true }; }
-      const h = series.length * (barH + gap) - gap;
       const pad = o.rowPad ?? (narrow ? 10 : 12);
       const sub = r.sub && !narrow ? 12 : 0;
-      const rowH = Math.max(h, sub ? 30 : 0) + pad * 2;
-      const item = { r, y, h: rowH, barsY: y + (rowH - h) / 2 };
+      const inner = rowHeight();
+      const rowH = Math.max(inner, sub ? 30 : 0) + pad * 2;
+      const item = { r, y, h: rowH, innerY: y + (rowH - inner) / 2, inner };
       y += rowH;
       return item;
     });
@@ -464,7 +514,7 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
     }
     for (const it of layout) {
       if (it.header) { text(g, 0, it.y + 14, it.r.label, "group-label"); continue; }
-      const hit = svgEl("rect", { x: 0, y: it.y, width: W, height: it.h, class: "hit", rx: 4 }, g);
+      it.hit = svgEl("rect", { x: 0, y: it.y, width: W, height: it.h, class: "hit", rx: 4 }, g);
       const cy = it.y + it.h / 2;
       if (it.r.sub && !narrow) {
         text(g, 0, cy - 2, it.r.label, "row-label");
@@ -472,18 +522,53 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
       } else {
         text(g, 0, cy + 4, it.r.label, "row-label");
       }
-      series.forEach((l, i) => {
-        const v = o.get(it.r, l);
-        const by = it.barsY + i * (barH + gap);
-        if (v == null || !(v > 0)) return;
-        const x1 = Math.max(x(v), labelW + 2);
-        svgEl("path", { d: barPath(labelW, x1, by, barH), style: `fill:${o.color ? o.color(it.r, l) : col(l)}`, "pointer-events": "none" }, g);
-        if (o.valueLabels !== false) text(g, x1 + 5, by + barH - 1, o.valFmt(v, it.r, l), "val", { "pointer-events": "none" });
-      });
-      bindTip(hit, () => o.tip(it.r));
-      hit.setAttribute("aria-label", o.ariaRow ? o.ariaRow(it.r) : it.r.label);
     }
-    box.replaceChildren(svg);
+    return { box, svg, g, x, labelW, layout, narrow };
+  }
+
+  // grouped horizontal bars: series: languages, get(row, lang) -> value
+  function hbars(id, o) {
+    const barH = Math.min(o.barH || 9, 24), gap = 2;
+    const f = rowFrame(id, o, () => o.series.length * (barH + gap) - gap);
+    const x0 = o.scale === "log" ? f.x(o.domain[0]) : f.labelW;
+    for (const it of f.layout) {
+      if (it.header) continue;
+      o.series.forEach((l, i) => {
+        const v = o.get(it.r, l);
+        const by = it.innerY + i * (barH + gap);
+        if (v == null || !(v > 0)) return;
+        const x1 = Math.max(f.x(v), x0 + 2);
+        svgEl("path", { d: barPath(x0, x1, by, barH), style: `fill:${o.color ? o.color(it.r, l) : col(l)}`, "pointer-events": "none" }, f.g);
+        if (o.valueLabels !== false) text(f.g, x1 + 5, by + barH - 1, o.valFmt(v, it.r, l), "val", { "pointer-events": "none" });
+      });
+      bindTip(it.hit, () => o.tip(it.r));
+      it.hit.setAttribute("aria-label", o.ariaRow ? o.ariaRow(it.r) : it.r.label);
+    }
+    f.box.replaceChildren(f.svg);
+  }
+
+  // dots on one line per row: points(row) -> [{x, lang, shape: "dot" | "ring"}]; a stem joins each row's extremes
+  function hdots(id, o) {
+    const R = 5.5;
+    const f = rowFrame(id, { ...o, rowPad: o.rowPad ?? 4 }, () => 2 * R + 4);
+    for (const it of f.layout) {
+      if (it.header) continue;
+      const cy = it.innerY + it.inner / 2;
+      const pts = o.points(it.r).filter((p) => p.x != null && p.x > 0);
+      if (o.stem && pts.length > 1) {
+        const xs = pts.map((p) => f.x(p.x));
+        svgEl("line", { x1: Math.min(...xs), x2: Math.max(...xs), y1: cy, y2: cy, class: "stem", "pointer-events": "none" }, f.g);
+      }
+      for (const p of pts) {
+        const c = col(p.lang);
+        svgEl("circle", p.shape === "ring"
+          ? { cx: f.x(p.x), cy, r: R - 1, style: `fill:var(--surface);stroke:${c}`, "stroke-width": 2.5, "pointer-events": "none" }
+          : { cx: f.x(p.x), cy, r: R, style: `fill:${c}`, stroke: "var(--surface)", "stroke-width": 2, "pointer-events": "none" }, f.g);
+      }
+      bindTip(it.hit, () => o.tip(it.r));
+      it.hit.setAttribute("aria-label", o.ariaRow ? o.ariaRow(it.r) : it.r.label);
+    }
+    f.box.replaceChildren(f.svg);
   }
 
   // ---------------------------------------------------------------- line chart with crosshair
@@ -499,7 +584,8 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
       svgEl("line", { x1: L, x2: W - R, y1: y(t), y2: y(t), class: "gridline" }, svg);
       text(svg, L - 8, y(t) + 4, o.yFmt(t), "tick axis-label", { "text-anchor": "end" });
     }
-    for (const t of o.xs) text(svg, x(t), H - B + 18, o.xFmt(t), "tick axis-label", { "text-anchor": "middle" });
+    const xLabelled = o.xs.filter((t, i) => !narrow || o.xs.length <= 6 || i % 2 === 0 || i === o.xs.length - 1);
+    for (const t of xLabelled) text(svg, x(t), H - B + 18, o.xFmt(t), "tick axis-label", { "text-anchor": "middle" });
     svgEl("line", { x1: L, x2: W - R, y1: H - B, y2: H - B, class: "baseline" }, svg);
     if (o.xLabel) text(svg, (L + W - R) / 2, H - 2, o.xLabel, "axis-label", { "text-anchor": "middle" });
     if (o.vline) {
@@ -552,54 +638,138 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
     box.replaceChildren(svg);
   }
 
-  // ---------------------------------------------------------------- page content
-  const S = D.system;
-  const spec = [
-    ["Machine", `${S.vendor.replace(/ Inc\.$/, "")} ${S.product}`],
-    ["CPU", `${S.cpu.replace(/ with .*Graphics$/, "")} · ${S.physical_cores} cores / ${S.logical_cpus} threads · up to ${(S.cpu_max_mhz / 1000).toFixed(1)} GHz`],
-    ["Memory", D.memory_text],
-    ["GPU", D.gpu_text],
-    ["System", `${S.os} · Linux ${S.kernel.split("-")[0]}`],
-    ["Runs", D.runs_text],
-  ];
-  const dl = document.getElementById("spec");
-  for (const [k, v] of spec) {
-    const d = document.createElement("div"), dt = document.createElement("dt"), dd = document.createElement("dd");
-    dt.textContent = k; dd.textContent = v; d.append(dt, dd); dl.appendChild(d);
-  }
-  const VER = D.version_labels;
-  const scores = document.getElementById("scores");
-  for (const l of LANGS) {
-    const c = document.createElement("div"); c.className = "score";
-    const who = document.createElement("div"); who.className = "who";
-    const k = document.createElement("span"); k.className = "key"; k.style.background = col(l);
-    who.append(k, document.createTextNode(l));
-    const ver = document.createElement("div"); ver.className = "ver"; ver.textContent = VER[l];
-    const big = document.createElement("div"); big.className = "big"; big.textContent = times(D.overall[l]);
-    const cap = document.createElement("div"); cap.className = "cap";
-    cap.textContent = l === "C++" ? "the reference" : `of C++ speed overall`;
-    c.append(who, ver, big, cap); scores.appendChild(c);
+  // ---------------------------------------------------------------- machine comparison
+  function renderCompare() {
+    if (!CMP || !document.getElementById("ch-cmp")) return;
+    const base = BY_ID[CMP.base], other = BY_ID[CMP.others[CMP.others.length - 1]];
+    const name = (m) => m.T.machine_name, short = (m) => `${m.T.machine_name} (${m.T.os_family})`;
+    const langs = CMP.langs;
+    document.getElementById("compare-text").textContent = CMP.text.compare_text;
+
+    // machine cards
+    const cards = document.getElementById("mcards");
+    if (!cards.children.length) {
+      for (const m of ALL.machines) {
+        const c = el("div", "mcard");
+        c.append(el("div", "mos", m.T.os_family), el("div", "mname", m.T.machine_name));
+        const ul = el("ul");
+        for (const [k, v] of m.T.spec.slice(1, 5)) ul.appendChild(el("li", null, v));
+        c.appendChild(ul); cards.appendChild(c);
+      }
+    }
+
+    // headline: how much faster each language is on the other machine
+    const ov = CMP.overall[other.id];
+    const sc = document.getElementById("cmp-scores");
+    sc.replaceChildren();
+    for (const l of langs) {
+      const c = el("div", "score");
+      const who = el("div", "who"); const k = el("span", "key"); k.style.background = col(l);
+      who.append(k, document.createTextNode(l));
+      c.append(who, el("div", "big", times(ov[l])), el("div", "cap", `as fast on the ${name(other)} as on the ${name(base)}`));
+      sc.appendChild(c);
+    }
+
+    // per test: speed on the other machine / speed on the reference machine (log scale)
+    document.getElementById("cmp-tests-title").textContent = `Speed on the ${name(other)} relative to the ${name(base)}, per test`;
+    legend("lg-cmp", langs, "dot");
+    const rows = [];
+    for (const c of ["cpu_single", "cpu_multi", "ram", "gpu"]) {
+      const ts = CMP.tests.filter((t) => t.category === c);
+      if (!ts.length) continue;
+      rows.push({ header: true, label: CAT[c] });
+      for (const t of ts) rows.push({ label: t.test, sub: DESC[t.test], t });
+    }
+    const r = (t, l) => t.ratio[other.id][l];
+    const range = logRange(CMP.tests.flatMap((t) => langs.map((l) => r(t, l))), 5);
+    hdots("ch-cmp", {
+      rows, scale: "log", domain: range.domain, ticks: range.ticks, rowPad: 5,
+      tickFmt: (t) => t === 1 ? "1× = same" : `${+t.toPrecision(3)}×`, refs: [{ x: 1, label: "" }],
+      points: (row) => langs.map((l) => ({ x: r(row.t, l), lang: l, shape: "dot" })),
+      aria: `Dot plot: speed of each language on the ${name(other)} relative to the ${name(base)}, per test`,
+      ariaRow: (row) => `${row.label}: ` + langs.map((l) => `${l} ${times(r(row.t, l))}`).join(", "),
+      tip: (row) => ({ title: `${row.t.test} · ${name(other)} vs ${name(base)}`,
+        rows: langs.filter((l) => r(row.t, l) != null).sort((a, b) => r(row.t, b) - r(row.t, a))
+          .map((l) => ({ color: col(l), value: times(r(row.t, l)), label: l })),
+        note: "right of the line: faster on the " + name(other) }),
+    });
+    table("tb-cmp", ["Test", ...langs], CMP.tests.map((t) => [t.test, ...langs.map((l) => times(r(t, l)))]));
+
+    // gap to C++ on each machine: a ring for the reference machine, a filled dot for the other, joined by a stem
+    const lg = document.getElementById("lg-gap");
+    lg.replaceChildren();
+    const sw = (cls, txt) => { const s = el("span"); s.append(el("i", cls), document.createTextNode(txt)); return s; };
+    lg.append(sw("ring", short(base)), sw("fill", short(other)));
+    const others = langs.filter((l) => l !== "C++");
+    const grows = [];
+    for (const c of [...["cpu_single", "cpu_multi", "ram", "gpu"].filter((c) => base.categories[c] && other.categories[c]), "overall"]) {
+      grows.push({ header: true, label: c === "overall" ? "Overall" : CAT[c] });
+      for (const l of others) grows.push({ label: l, lang: l, c });
+    }
+    const gv = (m, c, l) => c === "overall" ? m.overall[l] : (m.categories[c] || {})[l];
+    const grange = logRange(grows.filter((g) => !g.header).flatMap((g) => [gv(base, g.c, g.lang), gv(other, g.c, g.lang)]));
+    hdots("ch-gap", {
+      rows: grows, scale: "log", domain: grange.domain, ticks: grange.ticks, stem: true, labelW: (n) => n ? 96 : 130,
+      tickFmt: fmtX, refs: [{ x: 1, label: "" }], rowPad: 3,
+      points: (g) => [{ x: gv(base, g.c, g.lang), lang: g.lang, shape: "ring" }, { x: gv(other, g.c, g.lang), lang: g.lang, shape: "dot" }],
+      aria: "Dumbbell chart: each language's speed relative to C++ on each machine",
+      ariaRow: (g) => `${g.lang}: ${times(gv(base, g.c, g.lang))} on the ${name(base)}, ${times(gv(other, g.c, g.lang))} on the ${name(other)}`,
+      tip: (g) => ({ title: `${g.lang} · ${g.c === "overall" ? "overall" : CAT[g.c]} · relative to C++`,
+        rows: [{ color: col(g.lang), value: times(gv(base, g.c, g.lang)), label: short(base) },
+               { color: col(g.lang), value: times(gv(other, g.c, g.lang)), label: short(other) }], note: "1× = as fast as C++ on the same machine" }),
+    });
+    table("tb-gap", ["Area", "Language", short(base), short(other)],
+      grows.filter((g) => !g.header).map((g) => [g.c === "overall" ? "Overall" : CAT[g.c], g.lang, times(gv(base, g.c, g.lang)), times(gv(other, g.c, g.lang))]), 2);
+
+    document.getElementById("cmp-findings").innerHTML = CMP.text.compare_findings;
   }
 
-  const others = LANGS.filter((l) => l !== "C++");
-  const cats = ["cpu_single", "cpu_multi", "ram", "gpu"];
+  // ---------------------------------------------------------------- one machine
   const ratio = (t, l) => (t.rate[l] != null && t.rate["C++"]) ? t.rate[l] / t.rate["C++"] : null;
   const rangeNote = (t, l) => { const r = t.range[l]; return r ? `${num(r[0])}–${num(r[1])} over ${r[2]} runs` : ""; };
 
-  function renderAll() {
+  function fillText() {
+    for (const node of document.querySelectorAll("[data-t]")) node.textContent = T[node.dataset.t] ?? "";
+    const dl = document.getElementById("spec");
+    dl.replaceChildren();
+    for (const [k, v] of T.spec) {
+      const d = el("div"); d.append(el("dt", null, k), el("dd", null, v)); dl.appendChild(d);
+    }
+    document.getElementById("verify-badge").hidden = !T.verify_badge;
+    document.getElementById("findings").innerHTML = T.findings;
+    document.getElementById("sec-gpu").hidden = !D.tests.some((t) => t.category === "gpu");
+    document.getElementById("sec-heat").hidden = !D.sensors;
+    const scores = document.getElementById("scores");
+    scores.replaceChildren();
+    for (const l of LANGS) {
+      const c = el("div", "score");
+      const who = el("div", "who"); const k = el("span", "key"); k.style.background = col(l);
+      who.append(k, document.createTextNode(l));
+      c.append(who, el("div", "ver", D.version_labels[l]), el("div", "big", times(D.overall[l])),
+               el("div", "cap", l === "C++" ? "the reference" : "of C++ speed overall"));
+      scores.appendChild(c);
+    }
+    document.getElementById("foot-dates").textContent = "Results from " +
+      ALL.machines.map((m) => `${m.T.date_text} (${m.T.machine_name})`).join(" and ");
+  }
+
+  function renderMachine() {
+    const others = LANGS.filter((l) => l !== "C++");
+    const cats = ["cpu_single", "cpu_multi", "ram", "gpu"];
+
     // score by category
     legend("lg-cat", others);
     const catRows = [...cats.filter((c) => D.categories[c]).map((c) => ({ key: c, label: CAT[c] })), { key: "overall", label: "Overall" }];
-    const catRange = logRange(catRows.flatMap((r) => others.map((l) => r.key === "overall" ? D.overall[l] : D.categories[r.key][l])));
+    const catVal = (r, l) => r.key === "overall" ? D.overall[l] : D.categories[r.key][l];
+    const catRange = logRange(catRows.flatMap((r) => others.map((l) => catVal(r, l))));
     hbars("ch-cat", {
       rows: catRows, series: others, scale: "log", domain: catRange.domain, ticks: catRange.ticks,
       tickFmt: fmtX, barH: 12, labelW: (n) => n ? 110 : 150,
-      get: (r, l) => r.key === "overall" ? D.overall[l] : D.categories[r.key][l],
-      valFmt: (v) => times(v), refs: [{ x: 1, label: "" }],
+      get: catVal, valFmt: (v) => times(v), refs: [{ x: 1, label: "" }],
       aria: "Bar chart: speed of Python, R and JavaScript relative to C++, per hardware area",
-      tip: (r) => ({ title: r.label, rows: others.map((l) => ({ color: col(l), value: times(r.key === "overall" ? D.overall[l] : D.categories[r.key][l]), label: l })), note: "C++ = 1×" }),
+      tip: (r) => ({ title: r.label, rows: others.map((l) => ({ color: col(l), value: times(catVal(r, l)), label: l })), note: "C++ = 1×" }),
     });
-    table("tb-cat", ["Area", ...LANGS], catRows.map((r) => [r.label, ...LANGS.map((l) => times(r.key === "overall" ? D.overall[l] : D.categories[r.key][l]))]));
+    table("tb-cat", ["Area", ...LANGS], catRows.map((r) => [r.label, ...LANGS.map((l) => times(catVal(r, l)))]));
 
     // every test
     legend("lg-tests", others);
@@ -614,7 +784,7 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
       rows: testRows, series: others, scale: "log", domain: testRange.domain, ticks: testRange.ticks,
       tickFmt: fmtX, barH: 11, rowPad: 6,
       get: (r, l) => ratio(r.t, l), valFmt: (v) => times(v), refs: [{ x: 1, label: "" }],
-      aria: "Bar chart: speed relative to C++ for each of the 18 tests",
+      aria: `Bar chart: speed relative to C++ for each of the ${D.tests.length} tests`,
       tip: (r) => ({
         title: `${r.t.test} · ${r.t.unit}`,
         rows: LANGS.map((l) => ({ color: col(l), value: num(r.t.rate[l]), label: l === "C++" ? "C++" : `${l} (${times(ratio(r.t, l))})` }))
@@ -626,17 +796,17 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
 
     // parallel scaling
     legend("lg-par", LANGS, "line");
-    const maxW = Math.max(...D.workers), parTop = Math.max(maxW, ...LANGS.flatMap((l) => D.parallel[l] || []));
+    const maxW = Math.max(...D.workers), parTop = Math.max(maxW, ...LANGS.flatMap((l) => (D.parallel[l] || []).filter((v) => v != null)));
     lines("ch-par", {
       xs: D.workers, xDomain: [1, maxW], yDomain: [0, parTop * 1.04], yTicks: niceTicks(parTop, 6),
       series: LANGS.map((l) => ({ lang: l, values: D.parallel[l] })),
       yFmt: (t) => `${t}×`, xFmt: (t) => t, xLabel: "workers", height: 320,
       ideal: (t) => t, vline: { x: +S.physical_cores, label: `${S.physical_cores} physical cores` },
-      endFmt: (s, v) => `${s.lang} ${nf3.format(v)}×`, tipFmt: (v) => `${nf3.format(v)}×`,
+      endFmt: (s, v) => `${s.lang} ${nf3.format(v)}×`, tipFmt: (v) => v == null ? "–" : `${nf3.format(v)}×`,
       tipTitle: (w) => `${w} worker${w > 1 ? "s" : ""}`, tipNote: (w) => `perfect scaling: ${w}×`,
-      aria: "Line chart: speedup over one worker for 1 to 12 workers",
+      aria: `Line chart: speedup over one worker for 1 to ${maxW} workers`,
     });
-    table("tb-par", ["Workers", ...LANGS], D.workers.map((w, i) => [String(w), ...LANGS.map((l) => `${nf3.format(D.parallel[l][i])}×`)]));
+    table("tb-par", ["Workers", ...LANGS], D.workers.map((w, i) => [String(w), ...LANGS.map((l) => D.parallel[l][i] == null ? "–" : `${nf3.format(D.parallel[l][i])}×`)]));
 
     // memory bandwidth
     legend("lg-bw", LANGS);
@@ -650,7 +820,7 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
       tickFmt: (t) => `${t}`, barH: 9, get: (r, l) => r.get(l) ?? null, valFmt: (v) => `${nf3.format(v)} GB/s`,
       refs: D.peaks.ram ? [{ x: D.peaks.ram, label: `peak ${D.peaks.ram}` }] : [], labelW: (n) => n ? 96 : 150,
       aria: "Bar chart: memory bandwidth in GB/s",
-      tip: (r) => ({ title: `${r.label}, ${r.sub}`, rows: LANGS.filter((l) => r.get(l) != null).map((l) => ({ color: col(l), value: `${nf3.format(r.get(l))} GB/s`, label: l })), note: `theoretical peak ${D.peaks.ram} GB/s` }),
+      tip: (r) => ({ title: `${r.label}, ${r.sub}`, rows: LANGS.filter((l) => r.get(l) != null).map((l) => ({ color: col(l), value: `${nf3.format(r.get(l))} GB/s`, label: l })), note: D.peaks.ram ? `theoretical peak ${D.peaks.ram} GB/s` : "" }),
     });
     table("tb-bw", ["Test", ...LANGS], bwRows.map((r) => [`${r.label}, ${r.sub}`, ...LANGS.map((l) => r.get(l) != null ? nf3.format(r.get(l)) : "–")]));
 
@@ -664,7 +834,7 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
       yFmt: (t) => `${t}`, xFmt: (t) => `${t} GiB`, xLabel: "array size (GB/s written + read)",
       endFmt: (s, v) => `${s.lang} ${nf3.format(v)}`, tipFmt: (v) => v == null ? "skipped" : `${nf3.format(v)} GB/s`,
       tipTitle: (s) => `${s} GiB array`, tipNote: (s) => LANGS.filter((l) => D.alloc_seconds[l][D.alloc_sizes.indexOf(s)] != null).map((l) => `${l} ${D.alloc_seconds[l][D.alloc_sizes.indexOf(s)]} s`).join(" · "),
-      aria: "Line chart: allocation speed in GB/s for arrays of 1 to 16 GiB",
+      aria: `Line chart: allocation speed in GB/s for arrays of ${Math.min(...D.alloc_sizes)} to ${Math.max(...D.alloc_sizes)} GiB`,
     });
     table("tb-alloc", ["GiB", ...LANGS.map((l) => `${l} GB/s`)], D.alloc_sizes.map((s, i) => [String(s), ...LANGS.map((l) => D.alloc[l][i] == null ? "–" : nf3.format(D.alloc[l][i]))]));
 
@@ -679,29 +849,28 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
       tip: (r) => ({ title: "random reads from 2 GiB", rows: [{ color: col(r.lang), value: `${nf3.format(1000 / gather.rate[r.lang])} ns`, label: `${r.lang} · ${num(gather.rate[r.lang])} M reads/s` }] }),
     });
 
-    // GPU small multiples (the section is absent when the machine has no GPU results)
+    // GPU small multiples (rebuilt for each machine; the section is hidden when it has no GPU results)
     const grid = document.getElementById("gpu-grid");
-    if (grid) legend("lg-gpu", LANGS);
-    if (grid && !grid.children.length) {
-      for (const t of D.tests.filter((t) => t.category === "gpu")) {
-        const f = document.createElement("figure");
-        const cap = document.createElement("figcaption"); const s = document.createElement("span"); s.className = "t";
-        s.textContent = `${DESC[t.test]} (${t.unit})`; cap.appendChild(s);
-        const pk = t.unit === "GFLOP/s" ? D.peaks.gpu_fp32 : (t.test === "gpu_bandwidth" ? D.peaks.ram : null);
-        if (pk) { const n = document.createElement("span"); n.className = "note"; n.textContent = `line: peak ${nf0.format(pk)}`; cap.appendChild(n); }
-        const ch = document.createElement("div"); ch.className = "chart"; ch.id = `ch-${t.test}`;
-        f.append(cap, ch); grid.appendChild(f);
-      }
+    grid.replaceChildren();
+    legend("lg-gpu", LANGS);
+    const gpuTests = D.tests.filter((t) => t.category === "gpu");
+    const peakOf = (t) => t.unit === "GFLOP/s" ? D.peaks.gpu_fp32 : (t.test === "gpu_bandwidth" ? D.peaks.gpu_mem : null);
+    for (const t of gpuTests) {
+      const f = el("figure");
+      const cap = el("figcaption"); cap.appendChild(el("span", "t", `${DESC[t.test]} (${t.unit})`));
+      const pk = peakOf(t);
+      if (pk) cap.appendChild(el("span", "note", `line: peak ${nf0.format(pk)}`));
+      const ch = el("div", "chart"); ch.id = `ch-${t.test}`;
+      f.append(cap, ch); grid.appendChild(f);
     }
-    for (const t of grid ? D.tests.filter((t) => t.category === "gpu") : []) {
-      const peak = t.unit === "GFLOP/s" ? D.peaks.gpu_fp32 : (t.test === "gpu_bandwidth" ? D.peaks.ram : null);
+    for (const t of gpuTests) {
+      const peak = peakOf(t);
       const max = Math.max(...LANGS.map((l) => t.rate[l] || 0));
-      const top = peak ? peak * 1.06 : max * 1.25;
-      const step = top > 1000 ? 400 : top > 100 ? 50 : top > 40 ? 10 : top > 10 ? 5 : 1;
-      const ticks = []; for (let v = 0; v <= top; v += step) ticks.push(v);
+      const top = peak ? Math.max(peak, max) * 1.06 : max * 1.25;
+      const ticks = niceTicks(top * 0.95, 4);
       hbars(`ch-${t.test}`, {
         rows: LANGS.map((l) => ({ label: l, lang: l })), series: ["_"], scale: "linear", domain: [0, top], ticks,
-        tickFmt: (v) => nf0.format(v), barH: 12, rowPad: 5, labelW: () => 88,
+        tickFmt: (v) => v >= 1000 ? `${+(v / 1000).toPrecision(3)}k` : nf0.format(v), barH: 12, rowPad: 5, labelW: () => 88,
         get: (r) => t.rate[r.lang], valFmt: (v) => nf3.format(v), color: (r) => col(r.lang),
         refs: peak ? [{ x: peak, label: "" }] : [],
         aria: `Bar chart: ${t.test} in ${t.unit}`,
@@ -715,23 +884,34 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
     hbars("ch-util", {
       rows: D.util.map((u) => ({ label: u.name.split(" (")[0], sub: u.name.includes("(") ? u.name.split(" (")[1].replace(")", "") : "", u })),
       series: LANGS, scale: "linear", domain: [0, 100], ticks: [0, 25, 50, 75, 100], tickFmt: (t) => `${t}%`, barH: 9,
-      labelW: (n) => n ? 120 : 200, get: (r, l) => r.u.pct[l], valFmt: (v) => `${Math.round(v)}%`,
+      labelW: (n) => n ? 120 : 200, get: (r, l) => r.u.pct[l], valFmt: (v) => `${v < 1 ? nf3.format(v) : Math.round(v)}%`,
       aria: "Bar chart: share of theoretical peak reached by each language",
-      tip: (r) => ({ title: r.u.name, rows: LANGS.map((l) => ({ color: col(l), value: `${nf3.format(r.u.pct[l])}%`, label: l })), note: `peak ${nf0.format(r.u.peak)} ${r.u.unit}` }),
+      tip: (r) => ({ title: r.u.name, rows: LANGS.map((l) => ({ color: col(l), value: r.u.pct[l] == null ? "–" : `${nf3.format(r.u.pct[l])}%`, label: l })), note: `peak ${nf0.format(r.u.peak)} ${r.u.unit}` }),
     });
-    table("tb-util", ["Resource", "Peak", ...LANGS], D.util.map((u) => [u.name, `${nf0.format(u.peak)} ${u.unit}`, ...LANGS.map((l) => `${nf3.format(u.pct[l])}%`)]));
+    table("tb-util", ["Resource", "Peak", ...LANGS], D.util.map((u) => [u.name, `${nf0.format(u.peak)} ${u.unit}`, ...LANGS.map((l) => u.pct[l] == null ? "–" : `${nf3.format(u.pct[l])}%`)]));
 
-    if (D.sensors && document.getElementById("ch-heat")) heat();
+    if (D.sensors) heat();
   }
 
   // ---------------------------------------------------------------- sensor timeline
   function heat() {
     const s = D.sensors, box = document.getElementById("ch-heat");
     document.getElementById("heat-batch").textContent = `run ${s.batch}`;
+    const temps = s.cpu_temp.filter((v) => v != null), mhz = s.cpu_mhz.filter((v) => v != null);
+    document.getElementById("heat-caption").textContent = temps.length ? "CPU temperature and average clock, by language" : "Average CPU clock, by language";
     const W = Math.max(280, box.clientWidth), narrow = W < 520;
-    const L = narrow ? 42 : 52, R = 12, T = 22, gapY = 26, pH = narrow ? 120 : 150, B = 30;
-    const H = T + pH * 2 + gapY + B;
-    const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Line charts: CPU temperature and average clock speed over one full run" });
+    const L = narrow ? 42 : 52, R = 12, T0 = 22, gapY = 26, pH = narrow ? 120 : 150, B = 30;
+    const panels = [];
+    if (temps.length) {
+      const tempD = [Math.min(40, Math.floor((Math.min(...temps) - 5) / 20) * 20), Math.max(105, Math.max(...temps) + 5)];
+      panels.push({ key: "cpu_temp", d: tempD, ticks: [20, 40, 60, 80, 100].filter((v) => v >= tempD[0] && v <= tempD[1]), fmt: (v) => `${v}°`, label: "CPU °C" });
+    }
+    const mhzTop = Math.max(...mhz) * 1.08;
+    panels.push({ key: "cpu_mhz", d: [0, mhzTop], ticks: niceTicks(mhzTop / 1000 * 0.95, 4).map((v) => v * 1000).filter((v) => v > 0), fmt: (v) => `${v / 1000}`, label: "GHz, avg" });
+    panels.forEach((p, i) => { p.y0 = T0 + i * (pH + gapY); });
+    const spanH = panels.length * pH + (panels.length - 1) * gapY;
+    const H = T0 + spanH + B;
+    const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": `Line chart${panels.length > 1 ? "s" : ""}: ${temps.length ? "CPU temperature and " : ""}average clock speed over one full run` });
     const tMax = s.t[s.t.length - 1];
     const x = scale("linear", 0, tMax, L, W - R);
     const PH = { cpp: "C++", python: "Python", r: "R", js: "JavaScript" };
@@ -742,19 +922,12 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
         const name = PH[s.phase[i0]];
         if (name) {
           const x0 = x(s.t[i0]), x1 = x(s.t[i - 1]);
-          for (const py of [T, T + pH + gapY]) svgEl("rect", { x: x0, y: py, width: Math.max(1, x1 - x0), height: pH, style: `fill:${col(name)}`, opacity: 0.12 }, svg);
-          if (x1 - x0 > 30) text(svg, (x0 + x1) / 2, T - 8, name, "phase-label", { "text-anchor": "middle" });
+          for (const p of panels) svgEl("rect", { x: x0, y: p.y0, width: Math.max(1, x1 - x0), height: pH, style: `fill:${col(name)}`, opacity: 0.12 }, svg);
+          if (x1 - x0 > 30) text(svg, (x0 + x1) / 2, T0 - 8, name, "phase-label", { "text-anchor": "middle" });
         }
         i0 = i;
       }
     }
-    const temps = s.cpu_temp.filter((v) => v != null), mhz = s.cpu_mhz.filter((v) => v != null);
-    const tempD = [Math.min(40, Math.floor((Math.min(...temps) - 5) / 20) * 20), Math.max(105, Math.max(...temps) + 5)];
-    const mhzTop = Math.max(...mhz) * 1.08;
-    const panels = [
-      { key: "cpu_temp", y0: T, d: tempD, ticks: [20, 40, 60, 80, 100].filter((v) => v >= tempD[0] && v <= tempD[1]), fmt: (v) => `${v}°`, label: "CPU °C" },
-      { key: "cpu_mhz", y0: T + pH + gapY, d: [0, mhzTop], ticks: niceTicks(mhzTop / 1000 * 0.95, 4).map((v) => v * 1000).filter((v) => v > 0), fmt: (v) => `${v / 1000}`, label: "GHz, avg" },
-    ];
     for (const p of panels) {
       const y = scale("linear", p.d[0], p.d[1], p.y0 + pH, p.y0);
       for (const t of p.ticks) {
@@ -762,12 +935,13 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
         text(svg, L - 6, y(t) + 4, p.fmt(t), "tick axis-label", { "text-anchor": "end" });
       }
       text(svg, L + 4, p.y0 + 12, p.label, "axis-label");
-      svgEl("polyline", { points: s.t.map((t, i) => `${x(t).toFixed(1)},${y(s[p.key][i]).toFixed(1)}`).join(" "), fill: "none", stroke: "var(--ink-2)", "stroke-width": 1.5, "stroke-linejoin": "round" }, svg);
-      p.y = y;
+      const pts = s.t.map((t, i) => s[p.key][i] == null ? null : `${x(t).toFixed(1)},${y(s[p.key][i]).toFixed(1)}`).filter(Boolean);
+      svgEl("polyline", { points: pts.join(" "), fill: "none", stroke: "var(--ink-2)", "stroke-width": 1.5, "stroke-linejoin": "round" }, svg);
     }
-    for (let t = 0; t <= tMax; t += 60) text(svg, x(t), H - B + 18, `${t / 60} min`, "tick axis-label", { "text-anchor": "middle" });
-    const cross = svgEl("line", { x1: 0, x2: 0, y1: T, y2: T + pH * 2 + gapY, class: "crosshair", visibility: "hidden" }, svg);
-    const hit = svgEl("rect", { x: L, y: T, width: W - R - L, height: pH * 2 + gapY, style: "fill:transparent" }, svg);
+    const step = tMax > 900 ? 120 : 60;
+    for (let t = 0; t <= tMax; t += step) text(svg, x(t), H - B + 18, `${t / 60} min`, "tick axis-label", { "text-anchor": "middle" });
+    const cross = svgEl("line", { x1: 0, x2: 0, y1: T0, y2: T0 + spanH, class: "crosshair", visibility: "hidden" }, svg);
+    const hit = svgEl("rect", { x: L, y: T0, width: W - R - L, height: spanH, style: "fill:transparent" }, svg);
     let idx = 0;
     const build = (e) => {
       if (e) {
@@ -778,9 +952,12 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
       }
       cross.setAttribute("x1", x(s.t[idx])); cross.setAttribute("x2", x(s.t[idx])); cross.setAttribute("visibility", "visible");
       const who = PH[s.phase[idx]] || "between languages";
+      const rows = [];
+      if (temps.length) rows.push({ value: `${nf3.format(s.cpu_temp[idx])} °C`, label: "CPU temperature" });
+      rows.push({ value: `${(s.cpu_mhz[idx] / 1000).toFixed(2)} GHz`, label: "CPU clock, average" },
+                { value: `${s.gpu_busy[idx]}%`, label: "GPU busy" }, { value: `${nf3.format(s.ram[idx])} GiB`, label: "RAM in use" });
       return { title: `${Math.floor(s.t[idx] / 60)}:${String(Math.round(s.t[idx] % 60)).padStart(2, "0")} · ${who}`,
-        rows: [{ value: `${nf3.format(s.cpu_temp[idx])} °C`, label: "CPU temperature" }, { value: `${(s.cpu_mhz[idx] / 1000).toFixed(2)} GHz`, label: "CPU clock, average" },
-               { value: `${s.gpu_busy[idx]}%`, label: "GPU busy" }, { value: `${nf3.format(s.ram[idx])} GiB`, label: "RAM in use" }].map((r) => ({ ...r, color: PH[s.phase[idx]] ? col(PH[s.phase[idx]]) : "var(--ink-2)" })) };
+        rows: rows.map((r) => ({ ...r, color: PH[s.phase[idx]] ? col(PH[s.phase[idx]]) : "var(--ink-2)" })) };
     };
     bindTip(hit, build);
     hit.addEventListener("pointerleave", () => cross.setAttribute("visibility", "hidden"));
@@ -796,7 +973,31 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
     box.replaceChildren(svg);
   }
 
-  renderAll();
+  // ---------------------------------------------------------------- machine switcher
+  const seg = document.getElementById("seg");
+  for (const m of ALL.machines) {
+    const b = el("button", null, m.T.switch_label);
+    b.type = "button"; b.dataset.id = m.id;
+    b.addEventListener("click", () => select(m.id, true));
+    seg.appendChild(b);
+  }
+  function select(id, fromUser) {
+    const m = BY_ID[id] || BY_ID[ALL.default];
+    D = m; LANGS = m.langs; S = m.system; T = m.T;
+    for (const b of seg.children) b.setAttribute("aria-pressed", String(b.dataset.id === m.id));
+    fillText();
+    renderMachine();
+    if (fromUser) {
+      history.replaceState(null, "", `#${m.id}`);
+      // when the switcher is stuck to the top, jump to the start of the newly shown machine
+      if (document.querySelector(".switcher").getBoundingClientRect().top <= 0) document.getElementById("view").scrollIntoView({ block: "start" });
+    }
+  }
+  function renderAll() { renderCompare(); renderMachine(); }
+
+  select(location.hash.slice(1) in BY_ID ? location.hash.slice(1) : ALL.default, false);
+  renderCompare();
+  window.addEventListener("hashchange", () => { if (location.hash.slice(1) in BY_ID) select(location.hash.slice(1), false); });
   let pending = null, lastW = document.querySelector(".page").clientWidth;
   new ResizeObserver(() => {
     const w = document.querySelector(".page").clientWidth;

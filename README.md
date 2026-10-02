@@ -28,6 +28,20 @@ Radeon Vega 7 integrated GPU, Ubuntu 26.04:
 | Python 3.14 + NumPy | 0.42× | 0.23× | 0.12× | 1.2× | 0.97× |
 | R 4.5 | 0.17× | 0.06× | 0.09× | 0.34× | 0.38× |
 
+**Alienware m16 R1** (Windows) — Intel Core i9-13900HX (24 cores: 8 performance + 16 efficiency / 32 threads),
+64 GB DDR5-5200, NVIDIA GeForce RTX 4090 Laptop GPU (16 GB GDDR6), Windows 11 Home 25H2:
+
+| | Overall | CPU, one core | CPU, all cores | RAM | GPU |
+|---|---|---|---|---|---|
+| C++ | 1× | 1× | 1× | 1× | 1× |
+| JavaScript (Node.js 22) | 0.76× | 0.59× | 0.97× | 0.97× | 0.60× |
+| Python 3.13 + NumPy | 0.34× | 0.19× | 0.11× | 0.65× | 1.0× |
+| R 4.5 | 0.11× | 0.08× | 0.02× | 0.47× | 0.22× |
+
+Machine against machine, the Alienware runs the suite 2.2× as fast as the Dell in C++ and JavaScript, 1.8× in
+Python and 1.4× in R (its GPU 9.3×). R's all-cores score on Windows is low because R for Windows ships a
+single-threaded reference BLAS for matrix multiply (R on Ubuntu uses OpenBLAS); see the results page.
+
 ## What is measured
 
 | Category | Tests |
