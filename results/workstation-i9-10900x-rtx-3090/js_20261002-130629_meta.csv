@@ -1,0 +1,28 @@
+key,value
+run_id,js_20261002-130629
+batch,20261002-130053
+language,JavaScript
+mode,full
+language_version,Node.js v22.14.0 (V8 12.4.254.21-node.22)
+build,~/.nvm/versions/node/v22.14.0/bin/node --expose-gc
+blas,OpenBLAS 0.3.26 NO_LAPACKE DYNAMIC_ARCH NO_AFFINITY SkylakeX MAX_THREADS=64 (via koffi 3.3.2)
+numpy_version,
+cpu,Intel(R) Core(TM) i9-10900X CPU @ 3.70GHz
+physical_cores,10
+logical_cpus,20
+ram_gib,125.5
+power,battery
+platform_profile,
+cpu_temp_start_c,40
+cpu_temp_end_c,45
+started,2026-10-02T13:06:29
+elapsed_s,87.175
+host,workstation-i9-10900x-rtx-3090
+machine,workstation-i9-10900x-rtx-3090
+gpu_platform,"WebGPU (npm webgpu 0.6.1, Dawn, Vulkan)"
+gpu_device,nvidia-geforce-rtx-3090
+gpu_compute_units,
+gpu_max_clock_mhz,
+gpu_driver,NVIDIA: 580.173.02 580.173.2.0
+skipped,
+failed,

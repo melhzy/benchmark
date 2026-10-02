@@ -1,0 +1,4 @@
+key,value,source
+ram_bus_bits,256,"Intel ARK, Core i9-10900X: 4 memory channels (quad-channel DDR4), so 4 x 64-bit = 256-bit. The 8 installed modules are two per channel and do not widen the bus; the system snapshot records modules, not channels. Confirmed by measurement: C++ mem_triad reached 52.6 GB/s on 10 threads, above the 42.7 GB/s a dual-channel DDR4-2666 bus could deliver."
+vendor,Custom,"Self-built machine: the board leaves the DMI strings at their defaults, so the snapshot records vendor ""System manufacturer"" and product ""System Product Name"". There is no OEM to name."
+product,Custom workstation (i9-10900X),"As above. Chosen so the page's machine_name() shows this alone instead of the two placeholder DMI strings; the CPU and the four GPUs are listed in full in the specification table."

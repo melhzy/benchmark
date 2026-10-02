@@ -274,6 +274,8 @@ def build(folder):
         f = folder / f"sensors_{b}.csv"
         if f.exists():
             s = pd.read_csv(f)
+            if s.empty:   # header-only log (a sampler that died): try an older batch, else leave sensors unset
+                continue
             s["t"] = (s.time - s.time.iloc[0]).round(1)
             col = lambda c, f: [None if pd.isna(v) else f(v) for v in s[c]] if c in s else [None] * len(s)
             sensors = {"batch": b, "t": s.t.tolist(), "phase": s.phase.fillna("idle").tolist(),
@@ -295,8 +297,11 @@ def build(folder):
 
     full_batches = sorted(full.batch.unique())
     check = verify.compare(str(folder))
-    flagged = (system.get("os", "").lower().startswith("macos") and peaks["gpu_fp32"]
-               and "JavaScript" in rate and "gpu_fp32_peak" in rate.index
+    # A nominal rate above the hardware's estimated ceiling means the reported FLOP count does not describe the work
+    # the shader compiler actually ran. That test is physical, not platform-specific: relaxed math compilation does
+    # this under Metal and equally under Dawn's Vulkan backend on a discrete GPU, so it is not gated on the OS.
+    # (The per-category check further down already used this threshold without an OS condition.)
+    flagged = (peaks["gpu_fp32"] and "JavaScript" in rate and "gpu_fp32_peak" in rate.index
                and rate.loc["gpu_fp32_peak", "JavaScript"] / 1e9 > 1.05 * peaks["gpu_fp32"])
     scope = scope_summary(ratio, cat_of, ["gpu_fp32_peak"] if flagged else [])
     return {"id": folder.name, "langs": langs, "categories": categories, "overall": overall, "tests": tests, "workers": workers,
@@ -372,17 +377,17 @@ def texts(D):
     cv = (D["_spread"]["std"] / D["_spread"]["mean"]).dropna()
     # Use the same flag as the sensitivity analysis; avoid a second rounded-threshold decision.
     relaxed = "gpu_fp32_peak" in D["scope"]["excluded"]
-    RELAXED_NOTE = ("JavaScript's nominal FP32 compute rate exceeds the estimated GPU peak. The suite documents Metal's "
-                    "relaxed math compilation as the explanation: reassociation can reduce the arithmetic without changing "
-                    "the reported FLOP count. This result is flagged below; numerical agreement within tolerance does not "
-                    "establish equal executed work.")
+    RELAXED_NOTE = ("JavaScript's nominal FP32 compute rate exceeds the estimated GPU peak. The suite documents relaxed "
+                    "math compilation as the explanation (Metal on macOS, Dawn's backend elsewhere): reassociation can "
+                    "reduce the arithmetic without changing the reported FLOP count. This result is flagged below; "
+                    "numerical agreement within tolerance does not establish equal executed work.")
     T = {}
     T["kind"] = kind
     T["machine_name"] = machine_name(S)
     macos = os_family(S) == "macOS"
     T["os_family"] = os_family(S)
     T["switch_label"] = f"{T['machine_name']} · {T['os_family']}"
-    T["runs_text"] = f"{word(n_full)} batches containing full-mode results"
+    T["runs_text"] = f"{word(n_full)} batch{'es' if n_full != 1 else ''} containing full-mode results"
     T["spread_text"] = (f"median coefficient of variation {100 * cv.median():.1f}% across language/test pairs with repeated runs"
                         if len(cv) else "only one observation per language/test pair, so no run-to-run spread yet")
     day = datetime.strptime(max(D["newest_batch"].values())[:8], "%Y%m%d")
@@ -590,7 +595,7 @@ def all_text(Ds, out, langs):
                     own_blas = c in ("cpu_multi", "overall") and kind and all(
                         blas_kind(D["_meta"].get(l)) != kind for D in Ds if D is not top)
                     odd.append(f"for {esc(l)} the {esc(machine_name(top['system']))} is fastest"
-                               + (" (helped by Metal's relaxed math; see that machine's GPU section)" if relaxed else
+                               + (" (helped by relaxed math in its GPU shader compilation; see that machine's GPU section)" if relaxed else
                                   f" (its matrix multiply uses {kind} only there)" if own_blas else ""))
         title = "Overall" if c == "overall" else CAT_TITLES[c]
         items.append(f"<b>{title}:</b> {line}" + (f"; but {', and '.join(odd)}" if odd else "") + ".")

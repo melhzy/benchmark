@@ -112,7 +112,10 @@ hwmon_by_name() {
 }
 CPU_HWMON="$(hwmon_by_name k10temp zenpower coretemp cpu_thermal)"
 GPU_HWMON="$(hwmon_by_name amdgpu)"
-GPU_DEV="$(dirname "$(ls -d /sys/class/drm/card*/device/gpu_busy_percent 2>/dev/null | head -1)" 2>/dev/null || true)"
+# Only set when an amdgpu-style gpu_busy_percent really exists: `dirname ""` is ".", which would look like a
+# real sysfs directory and send the sensor loop down the AMD branch on an NVIDIA-only machine (where the
+# subsequent read fails and, under `set -e`, kills the loop after its header line).
+GPU_DEV="$(d="$(ls -d /sys/class/drm/card*/device/gpu_busy_percent 2>/dev/null | head -1)"; [[ -n "$d" ]] && dirname "$d" || true)"
 NVSMI="$(command -v nvidia-smi || true)"
 # macOS has no hwmon: Cpp/hw_probe reads the SoC die temperature, the GPU load and the memory in use (IOKit).
 PROBE="$ROOT/Cpp/hw_probe"
@@ -207,7 +210,9 @@ write_system() {
     for k in gpu_cuda_name gpu_sm_count gpu_boost_clock_mhz gpu_memory_clock_mhz gpu_memory_bus_bits gpu_memory_gbs; do
       if [[ -n "$(probe_val $k)" ]]; then kv $k "$(probe_val $k)"; fi
     done
-    kv power "$(for p in /sys/class/power_supply/*/online; do [[ "$(read1 "$p")" == 1 ]] && { echo AC; break; }; done | grep . || echo battery)"
+    # A machine with no battery (desktop, server) has no power_supply entries at all: that is mains power,
+    # not a discharging battery, so only report "battery" when a BAT* device actually exists.
+    kv power "$(for p in /sys/class/power_supply/*/online; do [[ "$(read1 "$p")" == 1 ]] && { echo AC; break; }; done | grep . || { ls -d /sys/class/power_supply/BAT* >/dev/null 2>&1 && echo battery || echo AC; })"
     kv platform_profile "$(read1 /sys/firmware/acpi/platform_profile)"
     kv governor "$(read1 /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)"
     kv epp "$(read1 /sys/devices/system/cpu/cpu0/cpufreq/energy_performance_preference)"

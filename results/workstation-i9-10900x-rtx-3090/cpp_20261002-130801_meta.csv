@@ -1,0 +1,28 @@
+key,value
+run_id,cpp_20261002-130801
+batch,20261002-130758
+language,C++
+mode,full
+language_version,g++ 13.3.0
+build,g++ -O3 -march=native -ffp-contract=off -std=c++20 -pthread
+blas,OpenBLAS 0.3.26 NO_LAPACKE DYNAMIC_ARCH NO_AFFINITY SkylakeX MAX_THREADS=64
+numpy_version,
+cpu,Intel(R) Core(TM) i9-10900X CPU @ 3.70GHz
+physical_cores,10
+logical_cpus,20
+ram_gib,125.5
+power,battery
+platform_profile,
+cpu_temp_start_c,36
+cpu_temp_end_c,45
+started,2026-10-02T13:08:01
+elapsed_s,74.8899
+host,workstation-i9-10900x-rtx-3090
+machine,workstation-i9-10900x-rtx-3090
+gpu_platform,NVIDIA CUDA
+gpu_device,NVIDIA GeForce RTX 3090
+gpu_compute_units,82
+gpu_max_clock_mhz,1695
+gpu_driver,580.173.02
+skipped,
+failed,
