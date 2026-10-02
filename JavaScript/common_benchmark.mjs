@@ -3,7 +3,7 @@
 //
 // Implements common/SPEC.md: the same tests, sizes (common/tests.csv) and output format as the
 // C++, Python and R versions, so all four can be compared in analysis.ipynb.
-// GPU tests use WebGPU (npm package `webgpu`, Google's Dawn on Vulkan / D3D12) with common/kernels.wgsl,
+// GPU tests use WebGPU (npm package `webgpu`, Google's Dawn on Vulkan / D3D12 / Metal) with common/kernels.wgsl,
 // a line-by-line translation of the OpenCL kernels the other languages use.
 // matmul_blas calls the system OpenBLAS (the same library C++ and R use) through the npm package
 // `koffi` (a foreign-function interface), since Node.js has no BLAS of its own.
@@ -75,10 +75,27 @@ function mandelRows(y0, y1, W) {
 }
 
 // ---------------------------------------------------------------------------
-// System information (Linux: /proc and /sys; Windows: one PowerShell query, plus Node's os module)
+// System information (Linux: /proc and /sys; Windows: one PowerShell query, plus Node's os module;
+// macOS: sysctl, vm_stat, pmset and ioreg, plus Cpp/hw_probe for the temperature)
 // ---------------------------------------------------------------------------
 
 const WINDOWS = process.platform === 'win32';
+const MACOS = process.platform === 'darwin';
+
+// Standard output of a command (trimmed), or '' if it cannot run.
+function run(cmd, args = []) {
+  try {
+    return execFileSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 30000 }).trim();
+  } catch {
+    return '';
+  }
+}
+const sysctl = (name) => run('/usr/sbin/sysctl', ['-n', name]);
+// A string property from `ioreg` output, e.g. "product-name" = <"MacBook Pro (14-inch, M5 Pro)">.
+function ioregString(args, key) {
+  const m = run('/usr/sbin/ioreg', args).match(new RegExp(`"${key}" = <?"([^"]*)"`));
+  return m ? m[1].trim() : '';
+}
 
 function readText(path) {
   try { return readFileSync(path, 'utf8').trim(); } catch { return null; }
@@ -108,6 +125,7 @@ function windowsInfo() {
 }
 
 function cpuinfoField(key) {
+  if (MACOS) return key === 'model name' ? [sysctl('machdep.cpu.brand_string')].filter(Boolean) : [];
   if (WINDOWS) return key === 'model name' && os.cpus().length ? [os.cpus()[0].model.trim()] : [];
   return (readText('/proc/cpuinfo') || '').split('\n')
     .filter((line) => line.split(':')[0].trim() === key)
@@ -116,6 +134,7 @@ function cpuinfoField(key) {
 
 function physicalCores() {
   if (WINDOWS) return windowsInfo().cores || os.cpus().length;
+  if (MACOS) return Number(sysctl('hw.physicalcpu')) || os.cpus().length;
   const ids = cpuinfoField('physical id'), cores = cpuinfoField('core id');
   const pairs = new Set(cores.map((c, i) => `${ids[i]}/${c}`));
   return pairs.size || os.cpus().length;
@@ -126,6 +145,14 @@ function logicalCpus() {
 }
 
 function meminfoKib(key) {
+  if (MACOS) {
+    if (key === 'MemTotal') return Math.floor(os.totalmem() / 1024);
+    // MemAvailable: free + speculative + inactive pages (os.freemem() counts free pages only on macOS)
+    const text = run('/usr/bin/vm_stat');
+    const page = Number((text.match(/page size of (\d+) bytes/) || [0, 16384])[1]);
+    const pages = [...text.matchAll(/^Pages (?:free|speculative|inactive):\s+(\d+)/gm)].reduce((s, m) => s + Number(m[1]), 0);
+    return Math.floor(pages * page / 1024);
+  }
   if (WINDOWS) return Math.floor((key === 'MemTotal' ? os.totalmem() : os.freemem()) / 1024);  // freemem = available
   for (const line of (readText('/proc/meminfo') || '').split('\n')) {
     if (line.startsWith(key + ':')) return Number(line.split(/\s+/)[1]);
@@ -134,6 +161,10 @@ function meminfoKib(key) {
 }
 
 function powerSource() {
+  if (MACOS) {
+    const text = run('/usr/bin/pmset', ['-g', 'batt']);
+    return text.includes("'AC Power'") ? 'AC' : text ? 'battery' : '';
+  }
   if (WINDOWS) return windowsInfo().power ? (windowsInfo().power === 'Offline' ? 'battery' : 'AC') : '';
   const base = '/sys/class/power_supply';
   if (!existsSync(base)) return '';
@@ -147,8 +178,18 @@ const WINDOWS_POWER_MODES = {
   'ded574b5-45a0-4f42-8737-46345c09c238': 'best performance',
 };
 
-// ACPI platform profile (Linux), or the Windows power mode for the current power source.
+const MACOS_POWER_MODES = { 0: 'automatic', 1: 'low power', 2: 'high power' };
+
+// ACPI platform profile (Linux), or the power mode for the current power source (Windows; macOS: pmset's
+// powermode, else lowpowermode).
 function platformProfile() {
+  if (MACOS) {
+    const text = run('/usr/bin/pmset', ['-g']);
+    const mode = text.match(/^\s*powermode\s+(\d)/m);
+    if (mode) return MACOS_POWER_MODES[mode[1]] || mode[1];
+    const low = text.match(/^\s*lowpowermode\s+(\d)/m);
+    return low ? (low[1] === '1' ? 'low power' : 'automatic') : '';
+  }
   if (WINDOWS) {
     const i = windowsInfo();
     const guid = String((powerSource() === 'battery' ? i.overlayDc : i.overlayAc) || '').toLowerCase();
@@ -157,10 +198,16 @@ function platformProfile() {
   return readText('/sys/firmware/acpi/platform_profile') || '';
 }
 
-// CPU temperature from the first hwmon sensor of a known CPU driver, in order of preference.
+// CPU temperature from the first hwmon sensor of a known CPU driver, in order of preference
+// (macOS: the SoC die, read by Cpp/hw_probe --temp).
 const CPU_SENSORS = ['k10temp', 'zenpower', 'coretemp', 'cpu_thermal'];
 
 function cpuTempC() {
+  if (MACOS) {
+    const probe = join(ROOT, 'Cpp', 'hw_probe');
+    const text = existsSync(probe) ? run(probe, ['--temp']) : '';
+    return text ? Number(text) : null;
+  }
   const base = '/sys/class/hwmon';
   if (!existsSync(base)) return null;
   const hwmons = readdirSync(base).sort();
@@ -182,8 +229,16 @@ const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$
 // hostname. The vendor is left out when the product name already starts with it.
 function machineId() {
   if (process.env.BENCH_MACHINE) return process.env.BENCH_MACHINE;
-  const vendor = WINDOWS ? windowsInfo().vendor || '' : (readText('/sys/class/dmi/id/sys_vendor') || '').trim();
-  const product = WINDOWS ? windowsInfo().product || '' : (readText('/sys/class/dmi/id/product_name') || '').trim();
+  let vendor, product;
+  if (WINDOWS) {
+    ({ vendor = '', product = '' } = windowsInfo());
+  } else if (MACOS) {
+    vendor = ioregString(['-rd1', '-c', 'IOPlatformExpertDevice'], 'manufacturer');
+    product = ioregString(['-p', 'IODeviceTree', '-rd1', '-n', 'product'], 'product-name') || sysctl('hw.model');
+  } else {
+    vendor = (readText('/sys/class/dmi/id/sys_vendor') || '').trim();
+    product = (readText('/sys/class/dmi/id/product_name') || '').trim();
+  }
   const v = slug(vendor), p = slug(product);
   const dmi = v && (p === v || p.startsWith(`${v}-`)) ? p : slug(`${vendor} ${product}`);
   return dmi || slug(os.hostname());
@@ -326,9 +381,12 @@ function setupMemGather(sizeMib) {
 
 // -- BLAS: the system OpenBLAS through koffi (FFI) ------------------------------------------
 // BENCH_OPENBLAS (full path), else the first library found in the usual Debian/Ubuntu, Fedora and
-// Arch locations, or on Windows the DLL that setup_windows.ps1 installs (the same lists as Cpp/Makefile
-// and common/windows_tools.ps1).
-const OPENBLAS_CANDIDATES = WINDOWS ? [
+// Arch locations, Homebrew's on macOS, or on Windows the DLL that setup_windows.ps1 installs (the same lists as
+// Cpp/Makefile and common/windows_tools.ps1).
+const OPENBLAS_CANDIDATES = MACOS ? [
+  '/opt/homebrew/opt/openblas/lib/libopenblas.dylib',
+  '/usr/local/opt/openblas/lib/libopenblas.dylib',
+] : WINDOWS ? [
   join(ROOT, 'deps', 'openblas', 'bin', 'libopenblas.dll'),
   'C:\\OpenBLAS\\bin\\libopenblas.dll',
   'C:\\msys64\\ucrt64\\bin\\libopenblas.dll',
@@ -355,6 +413,7 @@ async function loadBlas() {
   const path = findOpenBlas();
   if (!path) {
     throw new BlasMissing(WINDOWS ? 'OpenBLAS not found (run setup_windows.ps1, or set BENCH_OPENBLAS=C:\\path\\to\\libopenblas.dll)'
+      : MACOS ? 'OpenBLAS not found (brew install openblas, or set BENCH_OPENBLAS=/path/to/libopenblas.dylib)'
       : 'OpenBLAS not found (install libopenblas, or set BENCH_OPENBLAS=/path/to/libopenblas.so.0)');
   }
   const { default: koffi } = await import('koffi');

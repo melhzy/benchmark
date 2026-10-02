@@ -129,11 +129,14 @@ def machine_peaks(system, metas):
     `system` is the system snapshot with results/<machine>/hardware.csv applied on top."""
     first = lambda key: next((m[key] for m in metas if m.get(key) not in (None, "")), "")
     cpu = system.get("cpu") or first("cpu")
+    apple = cpu.lower().startswith("apple m")
     flags = set(system.get("cpu_flags", "").split())
     cores = fnum(system.get("physical_cores"), fnum(first("physical_cores"), 1))
     p_cores, e_cores = fnum(system.get("performance_cores")), fnum(system.get("efficiency_cores"), 0)
     ghz, e_ghz = fnum(system.get("cpu_max_mhz")) / 1000, fnum(system.get("cpu_e_max_mhz")) / 1000
-    if "avx512f" in flags and "intel" in cpu.lower():
+    if apple:
+        fpc = 16    # Apple Silicon performance cores: four 128-bit FMA pipes = 4 x 2 doubles x 2 FLOP per cycle
+    elif "avx512f" in flags and "intel" in cpu.lower():
         fpc = 32
     elif {"avx2", "fma"} <= flags:
         fpc = 16
@@ -142,18 +145,24 @@ def machine_peaks(system, metas):
     else:
         fpc = 4
     if np.isfinite(p_cores) and e_cores > 0 and np.isfinite(e_ghz):
-        # Hybrid Intel CPU: efficiency cores have half the FMA width of performance cores.
+        # Hybrid CPU: the other core type is taken to have half the FMA width of the fastest one (Intel E-cores;
+        # Apple's efficiency cores have two FP pipes to the performance cores' four).
         cpu_peak = p_cores * fpc * ghz + e_cores * fpc / 2 * e_ghz
     else:
         cpu_peak = cores * fpc * ghz
     ram_type, mts = system.get("ram_type", ""), fnum(system.get("ram_speed_mts"))
     modules = int(fnum(system.get("ram_modules"), 0))
     channels = 2 if ram_type.startswith("LPDDR") or modules >= 2 else max(modules, 1)
+    bus = fnum(system.get("ram_bus_bits"))      # given in hardware.csv where the OS reports no modules (Macs)
+    if np.isfinite(bus):
+        channels = int(bus // 64)
     ram_peak = mts * 8 * channels / 1000
     ocl = [m for m in metas if m.get("gpu_compute_units")]
     gpu = ocl[0] if ocl else {}
     name = gpu.get("gpu_device", "")
-    lanes = 128 if re.search(r"nvidia|geforce|rtx|quadro", name, re.I) else 8 if re.search(r"intel|iris|uhd|arc", name, re.I) else 64
+    # FP32 lanes per compute unit: NVIDIA SM 128, Apple GPU core 128, Intel EU 8, AMD CU 64
+    lanes = (128 if re.search(r"nvidia|geforce|rtx|quadro|apple", name, re.I)
+             else 8 if re.search(r"intel|iris|uhd|arc", name, re.I) else 64)
     cus = fnum(gpu.get("gpu_compute_units"))
     # The GPU may boost above the clock its driver reports: the highest clock the sensor log saw counts if higher.
     mhz = max((v for v in (fnum(gpu.get("gpu_max_clock_mhz")), fnum(system.get("gpu_clock_max_logged_mhz")),
@@ -163,7 +172,8 @@ def machine_peaks(system, metas):
     rnd = lambda v, d=1: round(v, d) if np.isfinite(v) else None
     return ({"cpu_fp64": rnd(cpu_peak), "ram": rnd(ram_peak), "gpu_fp32": rnd(cus * lanes * 2 * mhz / 1000), "gpu_mem": rnd(gpu_mem)},
             {"channels": channels, "cus": cus, "mhz": mhz, "discrete": discrete, "gpu_name": re.sub(r"\s*\(.*\)\s*$", "", name),
-             "p_cores": p_cores, "e_cores": e_cores, "ghz": ghz, "e_ghz": e_ghz,
+             "p_cores": p_cores, "e_cores": e_cores, "ghz": ghz, "e_ghz": e_ghz, "apple": apple, "bus": bus,
+             "p_name": system.get("performance_core_name") or "performance", "e_name": system.get("efficiency_core_name") or "efficiency",
              "clock_measured": system.get("cpu_max_mhz_source", "").startswith("measured")})
 
 
@@ -274,15 +284,51 @@ def build(folder):
             "system": {k: system.get(k, "") for k in ["vendor", "product", "chassis", "cpu", "cpu_max_mhz", "physical_cores",
                                                       "logical_cpus", "ram_gib", "ram_type", "ram_speed_mts", "ram_modules",
                                                       "ram_module_sizes_gib", "gpus", "os", "kernel", "power", "platform_profile",
-                                                      "suite_tests_sha"]},
+                                                      "suite_tests_sha", "ram_bus_bits", "model_id"]},
             "version_labels": labels, "newest_batch": newest,
             "_hw": hw, "_ratio": ratio, "_rate": rate, "_style": style_of, "_cat": cat_of, "_meta": run_meta, "_check": check,
             "_full_batches": full_batches, "_spread": spread, "_hardware": hardware}
 
 
 # ---------------------------------------------------------------------------- text for one machine
+def os_family(S):
+    o = S.get("os", "").lower()
+    return "Windows" if o.startswith("windows") else "macOS" if o.startswith("macos") else "Linux"
+
+
 def is_windows(S):
-    return S.get("os", "").lower().startswith("windows")
+    return os_family(S) == "Windows"
+
+
+def blas_kind(meta):
+    """The BLAS library a language's matrix multiply went through, from its meta value `blas`."""
+    b = (meta or {}).get("blas", "").lower()
+    if "openblas" in b:
+        return "OpenBLAS"
+    if "accelerate" in b or "veclib" in b:
+        return "Apple's Accelerate"
+    if "mkl" in b:
+        return "MKL"
+    if "rblas" in b:
+        return "R's own single-threaded reference BLAS"
+    return None
+
+
+def blas_text(D):
+    """'goes through OpenBLAS in every language' or, when they differ, which library each language uses."""
+    kinds = {l: blas_kind(D["_meta"].get(l)) for l in D["langs"]}
+    kinds = {l: k for l, k in kinds.items() if k}
+    if len(set(kinds.values())) <= 1:
+        return f"goes through {next(iter(kinds.values()), 'BLAS')} in every language"
+    by = {}
+    for l, k in kinds.items():
+        by.setdefault(k, []).append(l)
+    and_ = lambda xs: xs[0] if len(xs) == 1 else f"{', '.join(xs[:-1])} and {xs[-1]}"
+    return "goes through " + and_([f"{k} in {and_(ls)}" for k, ls in by.items()])
+
+
+def ram_label(S):
+    return f"{S.get('ram_type')}-{S.get('ram_speed_mts')}" if S.get("ram_speed_mts") else (S.get("ram_type") or "RAM")
 
 
 def machine_name(S):
@@ -302,10 +348,18 @@ def texts(D):
     max_ghz = hw["ghz"]
     n_full = len(D["_full_batches"])
     cv = (D["_spread"]["std"] / D["_spread"]["mean"]).dropna()
+    # A rate above the theoretical peak: on macOS, Dawn compiles WebGPU shaders for Metal in relaxed math mode, which
+    # lets Apple's compiler merge the peak kernel's pairs of multiply-adds (its check value then differs slightly).
+    over = {(l, u["name"]) for u in D["util"] for l, v in u["pct"].items() if v and v > 105}
+    relaxed = os_family(S) == "macOS" and any(l == "JavaScript" and "GPU compute" in n for l, n in over)
+    RELAXED_NOTE = ("JavaScript's GPU compute rate is above the GPU's peak: Dawn compiles WebGPU shaders for Metal in relaxed "
+                    "math mode, which lets Apple's shader compiler merge each pair of the kernel's multiply-adds, so it does "
+                    "about half the arithmetic (its result differs in the last digits). The OpenCL kernels are compiled strictly.")
     T = {}
     T["kind"] = kind
     T["machine_name"] = machine_name(S)
-    T["os_family"] = "Windows" if windows else "Linux"
+    macos = os_family(S) == "macOS"
+    T["os_family"] = os_family(S)
     T["switch_label"] = f"{T['machine_name']} · {T['os_family']}"
     T["runs_text"] = f"{word(n_full)} full run{'s' if n_full != 1 else ''}"
     T["spread_text"] = f"typically {100 * cv.median():.1f}% between runs" if len(cv) else "a single run, so no spread yet"
@@ -313,51 +367,65 @@ def texts(D):
     T["date_text"] = f"{day.day} {day:%B %Y}"
     secs = sum(fnum(D["_meta"][l].get("elapsed_s"), 0) for l in langs)
     T["minutes_text"] = f"A full run took about {max(1, round(secs / 60))} minutes on this {kind}."
-    core_desc = (f"{cores} physical cores ({hw['p_cores']:.0f} performance and {hw['e_cores']:.0f} efficiency cores)"
+    core_desc = (f"{cores} physical cores ({hw['p_cores']:.0f} {hw['p_name']} and {hw['e_cores']:.0f} {hw['e_name']} cores)"
                  if hybrid else f"{cores} physical cores")
     T["cores_text"] = (f"The same Mandelbrot work split across 1 to {max(D['workers'])} workers. The CPU has {core_desc} "
                        f"and {threads} hardware threads. C++ and JavaScript run their workers as threads; Python and R "
-                       f"start separate processes" + (" (on Windows both start them fresh, as Windows cannot fork)." if windows else "."))
+                       f"start separate processes" + (" (on Windows both start them fresh, as Windows cannot fork)." if windows else
+                                                      " (on macOS Python starts them fresh; R forks)." if macos else "."))
     channels = hw["channels"]
-    T["mem_text"] = ((f"Bandwidth against the memory's theoretical peak of {num(P['ram'])} GB/s ({S.get('ram_type')}-"
-                      f"{S.get('ram_speed_mts')}, {word(channels)} channel{'s' if channels != 1 else ''}). ")
+    width = (f"{hw['bus']:.0f}-bit bus" if np.isfinite(hw["bus"]) else f"{word(channels)} channel{'s' if channels != 1 else ''}")
+    T["mem_text"] = ((f"Bandwidth against the memory's theoretical peak of {num(P['ram'])} GB/s ({ram_label(S)}, {width}). ")
                      if P["ram"] else "Memory bandwidth (the memory's theoretical peak is unknown for this machine). ") + \
         "Python and R work on one core; C++ also runs the triad on all cores."
     sizes = S.get("ram_module_sizes_gib", "").split(" ")[0]
-    memory_text = (f"{S.get('ram_modules')} × {sizes} GB {S.get('ram_type')}-{S.get('ram_speed_mts')}"
-                   + (f", {word(channels)} channel{'s' if channels != 1 else ''} ({num(P['ram'])} GB/s peak)" if P["ram"] else ""))
+    memory_text = ((f"{fnum(S.get('ram_gib')):.0f} GB {ram_label(S)} unified memory" if macos or not S.get("ram_modules")
+                    else f"{S.get('ram_modules')} × {sizes} GB {ram_label(S)}")
+                   + (f", {width} ({num(P['ram'])} GB/s peak)" if P["ram"] else ""))
     gpu_name = hw["gpu_name"] or "GPU"
+    units = "GPU cores" if hw["apple"] else "compute units"
     if np.isfinite(hw["cus"]):
-        T["gpu_title"] = f"GPU ({gpu_name}, {hw['cus']:.0f} compute units)"
-        gpu_spec = f"{gpu_name} · {hw['cus']:.0f} compute units · {hw['mhz'] / 1000:.2g} GHz"
+        T["gpu_title"] = f"GPU ({gpu_name}, {hw['cus']:.0f} {units})"
+        gpu_spec = f"{gpu_name} · {hw['cus']:.0f} {units} · {hw['mhz'] / 1000:.2g} GHz"
     else:
         T["gpu_title"] = "GPU"
         gpu_spec = gpu_name if hw["gpu_name"] else (S.get("gpus") or "none found")
     gpu_rates = {t["test"]: t["rate"] for t in D["tests"] if t["category"] == "gpu"}
     up = gpu_rates.get("gpu_upload", {})
     slower = f", so its uploads are {up['C++'] / up['R']:.0f}× slower than C++'s here" if up.get("R") and up.get("C++") else ""
-    api = "WebGPU translation (Direct3D 12 underneath on Windows)" if windows else "WebGPU translation (Vulkan underneath)"
+    api = ("WebGPU translation (Direct3D 12 underneath on Windows)" if windows else
+           "WebGPU translation (Metal underneath on macOS)" if macos else "WebGPU translation (Vulkan underneath)")
     where = (" This GPU has its own memory, so uploads and downloads cross the PCIe bus." if hw["discrete"]
-             else " This GPU shares the system RAM.")
+             else " This GPU shares the system RAM (Apple's unified memory), so an upload or download is a copy within RAM."
+             if macos else " This GPU shares the system RAM.")
     T["gpu_text"] = (f"C++, Python and R run identical OpenCL kernels; JavaScript runs a line-by-line {api}. Once a "
                      "kernel runs, the language barely matters. Moving data does: R has no 32-bit number type and converts every "
-                     f"value{slower}.{where}")
+                     f"value{slower}.{where}" + (f" {RELAXED_NOTE}" if relaxed else ""))
     if not P["cpu_fp64"]:
         cpu_peak = "The CPU's maximum clock is unknown, so its compute peak is left out"
     elif hybrid and np.isfinite(hw["e_ghz"]):
-        cpu_peak = (f"The CPU peak assumes all {hw['p_cores']:.0f} performance cores at {max_ghz:.1f} GHz and all "
-                    f"{hw['e_cores']:.0f} efficiency cores at {hw['e_ghz']:.1f} GHz"
+        cpu_peak = (f"The CPU peak assumes all {hw['p_cores']:.0f} {hw['p_name']} cores at {max_ghz:.1f} GHz and all "
+                    f"{hw['e_cores']:.0f} {hw['e_name']} cores at {hw['e_ghz']:.1f} GHz"
                     + (" (the highest clocks measured on one busy core of each type)" if hw["clock_measured"] else ""))
     else:
         cpu_peak = (f"The CPU peak assumes all {cores} cores at full boost ({max_ghz:.1f} GHz"
                     + (", the highest clock measured on one busy core)" if hw["clock_measured"] else ")"))
     T["peak_text"] = (f"Best measured rate as a share of the theoretical peak. {cpu_peak}, which few laptops hold under sustained "
-                      "load; matrix multiply goes through OpenBLAS"
-                      + (" in every language except R, which on Windows uses its own reference BLAS." if windows and "rblas" in
-                         D["_meta"].get("R", {}).get("blas", "").lower() else " in every language."))
+                      f"load; matrix multiply {blas_text(D)}." + (" JavaScript's GPU compute share is above 100% for a compiler reason, "
+                                                    "explained under GPU." if relaxed else ""))
     s = D["sensors"]
-    T["heat_title"] = "Heat and clock speed during a run" if s and any(v is not None for v in s["cpu_temp"]) else "Clock speed during a run"
-    if s:
+    has_temp = bool(s and any(v is not None for v in s["cpu_temp"]))
+    has_clock = bool(s and any(v is not None for v in s["cpu_mhz"]))
+    T["heat_title"] = ("Heat and clock speed during a run" if has_temp and has_clock else "Heat during a run" if has_temp
+                       else "Clock speed during a run")
+    if s and not has_clock:
+        temps = [v for v in s["cpu_temp"] if v is not None]
+        gpu = [g for g, p in zip(s["gpu_busy"], s["phase"]) if p != "idle"]
+        T["heat_text"] = (f"One full run, sampled every second. The chip (the hottest of its die sensors) peaked at {max(temps):.0f} °C"
+                          if temps else "One full run, sampled every second")
+        T["heat_text"] += (f", and the GPU was at most {max(gpu)}% busy. macOS reports clock speeds only to administrators, "
+                           "so the clock is not logged." if gpu else ".")
+    elif s:
         busy = [m for m, p in zip(s["cpu_mhz"], s["phase"]) if m is not None and p != "idle"]
         temps = [v for v in s["cpu_temp"] if v is not None]
         clock = (f"while the benchmark ran the average clock across all cores was {np.mean(busy) / 1000:.1f} GHz"
@@ -370,21 +438,29 @@ def texts(D):
     profile = S.get("platform_profile")
     T["power_text"] = (f"The {kind} was on {S.get('power') or 'unknown'} power"
                        + (f" with Windows' {profile} power mode." if windows and profile else
+                          f" with macOS's {profile} power mode." if macos and profile else
                           f" with the {profile} power profile." if profile else "."))
     T["cool_text"] = ("Windows lets no program read the CPU temperature without administrator rights, so the runner pauses "
                       "30 seconds before each language instead of waiting for the CPU to cool."
-                      if windows else "Before each language, the runner waits for the CPU to cool below 60 °C.")
-    if windows:
+                      if windows else "Before each language, the runner waits for the chip (its hottest die sensor) to cool below 60 °C."
+                      if macos else "Before each language, the runner waits for the CPU to cool below 60 °C.")
+    if macos:
+        T["alloc_note"] = ("macOS hands every language the same 16 KB pages (Apple Silicon's page size; NumPy's 2 MB pages are a "
+                           "Linux feature) and zero-fills each page on first touch.")
+    elif windows:
         T["alloc_note"] = ("Windows hands every language normal 4 KB pages (its large pages need a special privilege) and zeroes "
                            "each page on first touch, so first use of new memory costs every language about the same.")
     else:
         T["alloc_note"] = ("NumPy asks Linux for 2 MB memory pages for big arrays, which cuts the number of page faults when new "
                            "memory is first touched; the other languages use normal 4 KB pages.")
-    T["runs_label"] = f"{T['runs_text']}, {S.get('power') or '?'} power" + (f", {profile} {'mode' if windows else 'profile'}" if profile else "")
+    T["runs_label"] = f"{T['runs_text']}, {S.get('power') or '?'} power" + (f", {profile} {'mode' if windows or macos else 'profile'}" if profile else "")
 
     cpu_name = re.sub(r" with .*Graphics$", "", S.get("cpu", ""))
-    threads_text = f"{cores} cores ({hw['p_cores']:.0f} P + {hw['e_cores']:.0f} E) / {threads} threads" if hybrid else f"{cores} cores / {threads} threads"
+    types = (f"{hw['p_cores']:.0f} {hw['p_name']} + {hw['e_cores']:.0f} {hw['e_name']}" if macos
+             else f"{hw['p_cores']:.0f} P + {hw['e_cores']:.0f} E")
+    threads_text = f"{cores} cores ({types}) / {threads} threads" if hybrid else f"{cores} cores / {threads} threads"
     os_text = (f"{S.get('os')} · build {'.'.join(S.get('kernel', '').split('.')[2:])}" if windows
+               else f"{S.get('os')} · Darwin {S.get('kernel', '')}" if macos
                else f"{S.get('os')} · Linux {S.get('kernel', '').split('-')[0]}")
     T["spec"] = [["Machine", T["machine_name"]],
                  ["CPU", f"{cpu_name} · {threads_text}" + (f" · up to {max_ghz:.1f} GHz" if np.isfinite(max_ghz) else "")],
@@ -414,6 +490,8 @@ def texts(D):
         hi, lo = r.idxmax(), r.idxmin()
         lead = f"{esc(l)}: {fx(D['overall'][l])} of C++ speed overall."
         best = (f"Beats C++ on {mono(hi)} ({fx(r[hi])})" if r[hi] > 1.05 else f"Comes closest on {mono(hi)} ({fx(r[hi])})")
+        if relaxed and l == "JavaScript" and hi == "gpu_fp32_peak":
+            best = best[:-1] + ", only because Metal's relaxed math halves that kernel's arithmetic; see GPU)"
         worst = f"falls furthest behind on {mono(lo)} ({fx(r[lo])}, {1 / r[lo]:.0f}× slower)" if r[lo] < 0.95 else ""
         a, b = gmean(ratio.loc[loops, l]), gmean(ratio.loc[libs, l])
         mix = (f" Plain loops run at {fx(a)} of C++ and library or vectorized code at {fx(b)}." if a and b else "")
@@ -429,15 +507,110 @@ def texts(D):
         ceil.append(f"matrix multiply reaches {num(g)} GFLOP/s at best ({100 * g / P['cpu_fp64']:.0f}% of the CPU's theoretical peak)")
     gp = next((t for t in D["tests"] if t["test"] == "gpu_fp32_peak"), None)
     if gp and P["gpu_fp32"]:
-        g = max(v for v in gp["rate"].values() if v)
+        # rates above the peak (see RELAXED_NOTE) are not the hardware's ceiling
+        g = max((v for v in gp["rate"].values() if v and v <= 1.05 * P["gpu_fp32"]), default=max(v for v in gp["rate"].values() if v))
         ceil.append(f"GPU compute reaches {num(g)} GFLOP/s ({100 * g / P['gpu_fp32']:.0f}% of its peak)")
     if ceil:
+        same_blas = len({blas_kind(D["_meta"].get(l)) for l in langs} - {None}) <= 1
         items.append((None, f"<b>The hardware sets the ceiling:</b> {'; '.join(ceil)}, about the same from every language"
-                            + (" that uses OpenBLAS." if windows and mm and mm["rate"].get("R") and "rblas" in
-                               D["_meta"].get("R", {}).get("blas", "").lower() else ".")))
+                            + ("." if same_blas else " that uses the same BLAS library.")))
     key = lambda l: ' style="--k: var(--c-%s)"' % CSS_KEY[l] if l else ""
     T["findings"] = "\n".join(f"<li{key(l)}><span>{body}</span></li>" for l, body in items)
     return T
+
+
+def all_text(Ds, out, langs):
+    """Text for the charts that show every machine at once (speed relative to the reference, and to C++)."""
+    base = Ds[0]
+    nb = machine_name(base["system"])
+    n = word(len(Ds))
+    T = {"all_text": (f"Every language on {'both' if len(Ds) == 2 else 'all ' + n} {'laptops' if len({D['system'].get('chassis') for D in Ds}) == 1 and base['system'].get('chassis') == 'laptop' else 'machines'} at once. "
+                      f"The first chart shows how fast each language runs on each machine relative to the {nb} (1×), overall and in "
+                      "each hardware area; the second shows how far each language is from C++ on the same machine. The findings "
+                      f"rank the machines by C++ speed relative to the {nb}. Below them, two machines can be compared test by test.")}
+    speed = lambda D, c, l: 1.0 if D is base else (out["overall"][D["id"]] if c == "overall" else out["categories"][D["id"]].get(c, {})).get(l)
+    items = []
+    for c in ["overall", *CATS]:
+        vals = {D["id"]: speed(D, c, "C++") for D in Ds}
+        if any(v is None for v in vals.values()):
+            continue
+        order = sorted(Ds, key=lambda D: -vals[D["id"]])
+        line = ", ".join(f"{esc(machine_name(D['system']))} {fx(vals[D['id']])}" for D in order)
+        # a language whose fastest machine is not C++'s points at the software on that machine
+        odd = []
+        for l in langs:
+            if l == "C++":
+                continue
+            lv = {D["id"]: speed(D, c, l) for D in Ds}
+            if all(v is not None for v in lv.values()):
+                top = max(Ds, key=lambda D: lv[D["id"]])
+                if top is not order[0]:
+                    relaxed = c in ("gpu", "overall") and l == "JavaScript" and any(
+                        u["name"].startswith("GPU compute") and (u["pct"].get(l) or 0) > 105 for u in top["util"])
+                    kind = blas_kind(top["_meta"].get(l))
+                    own_blas = c in ("cpu_multi", "overall") and kind and all(
+                        blas_kind(D["_meta"].get(l)) != kind for D in Ds if D is not top)
+                    odd.append(f"for {esc(l)} the {esc(machine_name(top['system']))} is fastest"
+                               + (" (helped by Metal's relaxed math; see that machine's GPU section)" if relaxed else
+                                  f" (its matrix multiply uses {kind} only there)" if own_blas else ""))
+        title = "Overall" if c == "overall" else CAT_TITLES[c]
+        items.append(f"<b>{title}:</b> {line}" + (f"; but {', and '.join(odd)}" if odd else "") + ".")
+    for l in langs:
+        if l == "C++":
+            continue
+        gaps = [(D, D["overall"].get(l)) for D in Ds if D["overall"].get(l)]
+        if len(gaps) == len(Ds):
+            lo, hi = min(gaps, key=lambda g: g[1]), max(gaps, key=lambda g: g[1])
+            items.append(f"<b>{esc(l)}</b> runs at {fx(lo[1])} to {fx(hi[1])} of C++'s speed overall across {'both' if len(Ds) == 2 else 'the ' + n} machines "
+                         f"(furthest behind C++ on the {esc(machine_name(lo[0]['system']))}, closest on the "
+                         f"{esc(machine_name(hi[0]['system']))}).")
+    T["all_findings"] = "\n".join(f"<li><span>{x}</span></li>" for x in items)
+    return T
+
+
+def pair_text(B, O, rel, out, tests, langs):
+    """Text comparing machine O with the reference machine B."""
+    nb, no = machine_name(B["system"]), machine_name(O["system"])
+    os_b, os_o = os_family(B["system"]), os_family(O["system"])
+    gpu_b, gpu_o = B["_hw"]["gpu_name"] or "its GPU", O["_hw"]["gpu_name"] or "its GPU"
+    shas = {D["system"].get("suite_tests_sha") for D in (B, O)} - {"", None}
+    same = (f"Both ran the same version of the tests (suite {next(iter(shas))})." if len(shas) == 1
+            else "Warning: the two machines ran different versions of the tests, so these ratios may not be comparable.")
+    T = {"compare_text": (f"How many times faster each language runs on the {no} ({os_o}) than on the {nb} ({os_b}), "
+                          f"test by test. {same} The differences come from the hardware - and, for a few tests, from the "
+                          "operating system and how each language is installed on it.")}
+    ov = out["overall"][O["id"]]
+    pc = lambda c, l: out["categories"][O["id"]].get(c, {}).get(l)
+    items = []
+    fastest = sorted(((l, v) for l, v in ov.items() if v), key=lambda kv: -kv[1])
+    if fastest:
+        items.append(f"<b>Overall</b>, the {esc(no)} is " + ", ".join(f"{fx(v)} as fast for {esc(l)}" for l, v in fastest)
+                     + f" (geometric mean of the four hardware areas).")
+    if pc("gpu", "C++"):
+        items.append(f"<b>GPU:</b> the {esc(gpu_o)} runs the same kernels {fx(pc('gpu', 'C++'))} as fast as the {esc(gpu_b)} "
+                     f"(C++; averaged over the five GPU tests).")
+    if pc("cpu_single", "C++") and pc("cpu_multi", "C++"):
+        items.append(f"<b>CPU:</b> one core is {fx(pc('cpu_single', 'C++'))} as fast and all cores together "
+                     f"{fx(pc('cpu_multi', 'C++'))} (C++), with {O['system'].get('physical_cores')} cores against "
+                     f"{B['system'].get('physical_cores')}.")
+    if pc("ram", "C++"):
+        items.append(f"<b>RAM:</b> {fx(pc('ram', 'C++'))} as fast for C++ ({ram_label(O['system'])} against {ram_label(B['system'])}).")
+    # tests where a language moves very differently from C++ point at the software, not the hardware
+    odd = []
+    for t in tests:
+        c = rel.get("C++", {}).get(t)
+        for l in langs:
+            r = rel.get(l, {}).get(t)
+            if l != "C++" and c and r and (r / c > 2.5 or c / r > 2.5):
+                odd.append((abs(np.log(r / c)), l, t, r, c))
+    for _, l, t, r, c in sorted(odd, reverse=True)[:3]:
+        why = ""
+        kb, ko = blas_kind(B["_meta"].get(l)), blas_kind(O["_meta"].get(l))
+        if t == "matmul_blas" and kb and ko and kb != ko:
+            why = f" {esc(l)} uses {kb} on the {esc(nb)} but {ko} on the {esc(no)}: that is the software, not the hardware."
+        items.append(f"<b>{esc(l)} on {mono(t)}:</b> {fx(r)} as fast on the {esc(no)}, while C++ is {fx(c)} as fast.{why}")
+    T["compare_findings"] = "\n".join(f"<li><span>{x}</span></li>" for x in items)
+    return {k: v.replace(" - ", " — ") for k, v in T.items()}
 
 
 # ---------------------------------------------------------------------------- comparing machines
@@ -463,59 +636,18 @@ def compare(Ds):
         out["tests"].append({"test": t, "category": cat[t],
                              "ratio": {m: {l: (round(r, 4) if (r := rels[m][l][t]) else None) for l in langs} for m in rels}})
 
-    # text (two machines: the newest compared with the reference)
-    B, O = base, others[-1]
-    nb, no = machine_name(B["system"]), machine_name(O["system"])
-    os_b = "Windows" if is_windows(B["system"]) else "Linux"
-    os_o = "Windows" if is_windows(O["system"]) else "Linux"
-    gpu_b, gpu_o = B["_hw"]["gpu_name"] or "its GPU", O["_hw"]["gpu_name"] or "its GPU"
+    # text: the lede for all machines, then one comparison text per machine against the reference
+    names = [f"{machine_name(D['system'])} on {os_family(D['system'])}" for D in Ds]
     T = {"h1": f"Four languages, {word(len(Ds))} {Ds[0]['system'].get('chassis') or 'machine'}s"
                if len({D['system'].get('chassis') for D in Ds}) == 1 else f"Four languages, {word(len(Ds))} machines",
          "names": {D["id"]: machine_name(D["system"]) for D in Ds}}
     T["lede"] = (f"The same 18 tests, written in C++, Python, R and JavaScript, run on {word(len(Ds))} "
                  f"{'laptops' if T['h1'].endswith('laptops') else 'machines'} - "
-                 + " and ".join(f"{machine_name(D['system'])} on {'Windows' if is_windows(D['system']) else 'Linux'}" for D in Ds)
+                 + (f"{', '.join(names[:-1])} and {names[-1]}" if len(names) > 1 else names[0])
                  + " - to see how each language uses a computer's CPU, memory and GPU.").replace(" - ", " — ")
-    shas = {D["system"].get("suite_tests_sha") for D in Ds} - {"", None}
-    same = (f"Both ran the same version of the tests (suite {next(iter(shas))})." if len(shas) == 1
-            else "Warning: the machines ran different versions of the tests, so these ratios may not be comparable.")
-    T["compare_text"] = (f"How many times faster each language runs on the {no} ({os_o}) than on the {nb} ({os_b}), "
-                         f"test by test. {same} The differences come from the hardware - and, for a few tests, from the "
-                         "operating system and how each language is installed on it.")
-    ov = out["overall"][O["id"]]
-    pc = lambda c, l: out["categories"][O["id"]].get(c, {}).get(l)
-    items = []
-    fastest = sorted(((l, v) for l, v in ov.items() if v), key=lambda kv: -kv[1])
-    if fastest:
-        items.append(f"<b>Overall</b>, the {esc(no)} is " + ", ".join(f"{fx(v)} as fast for {esc(l)}" for l, v in fastest)
-                     + f" (geometric mean of the four hardware areas).")
-    if pc("gpu", "C++"):
-        items.append(f"<b>GPU:</b> the {esc(gpu_o)} runs the same kernels {fx(pc('gpu', 'C++'))} as fast as the {esc(gpu_b)} "
-                     f"(C++; averaged over the five GPU tests), the largest gap of any area.")
-    if pc("cpu_single", "C++") and pc("cpu_multi", "C++"):
-        items.append(f"<b>CPU:</b> one core is {fx(pc('cpu_single', 'C++'))} as fast and all cores together "
-                     f"{fx(pc('cpu_multi', 'C++'))} (C++), with {O['system'].get('physical_cores')} cores against "
-                     f"{B['system'].get('physical_cores')}.")
-    if pc("ram", "C++"):
-        items.append(f"<b>RAM:</b> {fx(pc('ram', 'C++'))} as fast for C++ ({O['system'].get('ram_type')}-{O['system'].get('ram_speed_mts')} "
-                     f"against {B['system'].get('ram_type')}-{B['system'].get('ram_speed_mts')}).")
-    # tests where a language moves very differently from C++ point at the software, not the hardware
-    odd = []
-    rel = rels[O["id"]]
-    for t in tests:
-        c = rel.get("C++", {}).get(t)
-        for l in langs:
-            r = rel.get(l, {}).get(t)
-            if l != "C++" and c and r and (r / c > 2.5 or c / r > 2.5):
-                odd.append((abs(np.log(r / c)), l, t, r, c))
-    for _, l, t, r, c in sorted(odd, reverse=True)[:3]:
-        why = ""
-        if l == "R" and t == "matmul_blas" and ("rblas" in O["_meta"].get("R", {}).get("blas", "").lower()
-                                                  or "rblas" in B["_meta"].get("R", {}).get("blas", "").lower()):
-            why = (" R for Windows ships a single-threaded reference BLAS, while R on Ubuntu uses the system OpenBLAS: "
-                   "that is the software, not the hardware.")
-        items.append(f"<b>{esc(l)} on {mono(t)}:</b> {fx(r)} as fast on the {esc(no)}, while C++ is {fx(c)} as fast.{why}")
-    T["compare_findings"] = "\n".join(f"<li><span>{x}</span></li>" for x in items)
+    T["by_other"] = {O["id"]: pair_text(base, O, rels[O["id"]], out, tests, langs) for O in others}
+    T.update(T["by_other"][others[-1]["id"]])      # the newest machine's comparison is shown first
+    T.update(all_text(Ds, out, langs))
     out["text"] = T
     return out
 

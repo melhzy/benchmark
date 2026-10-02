@@ -49,10 +49,19 @@
 #else
 #include <unistd.h>
 #endif
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#include "macos_sys.h"
+#endif
 
 #ifndef NO_OPENCL
 #define CL_TARGET_OPENCL_VERSION 120
+#ifdef __APPLE__
+#define CL_SILENCE_DEPRECATION
+#include <OpenCL/cl.h>
+#else
 #include <CL/cl.h>
+#endif
 #endif
 
 #ifndef BENCH_BUILD
@@ -169,7 +178,7 @@ static double median(std::vector<double> v) {
 }
 
 // ---------------------------------------------------------------------------
-// System information (Linux: /proc and /sys; Windows: registry and Win32 API)
+// System information (Linux: /proc and /sys; Windows: registry and Win32 API; macOS: sysctl, IOKit, pmset)
 // ---------------------------------------------------------------------------
 
 #ifdef _WIN32
@@ -245,6 +254,38 @@ static fs::path self_exe() {
     DWORD n = GetModuleFileNameW(nullptr, buf.data(), (DWORD)buf.size());
     buf.resize(n);
     return fs::path(buf);
+}
+
+#elif defined(__APPLE__)
+
+static std::string cpu_model() { return macos::sysctl_str("machdep.cpu.brand_string"); }
+static int logical_cpus() { return (int)sysconf(_SC_NPROCESSORS_ONLN); }
+static int physical_cores() { return (int)macos::sysctl_int("hw.physicalcpu", logical_cpus()); }
+static double ram_total_kib() { return macos::sysctl_int("hw.memsize") / 1024.0; }
+static double ram_available_kib() { return macos::ram_available_bytes() / 1024.0; }
+static std::string power_source() { return macos::power_source(); }
+static std::string platform_profile() { return macos::power_mode(); }
+
+static std::string cpu_temp_c() {
+    double t = macos::soc_temp_c();
+    return t > -100 ? num(t, 3) : "";
+}
+
+static std::string hostname() {
+    char buf[256] = {0};
+    gethostname(buf, sizeof buf - 1);
+    return buf;
+}
+
+static std::string firmware_vendor() { return macos::vendor(); }
+static std::string firmware_product() { return macos::product(); }
+
+static fs::path self_exe() {
+    uint32_t n = 0;
+    _NSGetExecutablePath(nullptr, &n);
+    std::string buf(n, '\0');
+    _NSGetExecutablePath(buf.data(), &n);
+    return fs::canonical(buf.c_str());
 }
 
 #else  // Linux
@@ -1134,7 +1175,11 @@ int main(int argc, char** argv) {
         {"batch", batch},
         {"language", "C++"},
         {"mode", mode},
+#ifdef __clang__
+        {"language_version", "clang++ " __VERSION__},
+#else
         {"language_version", "g++ " __VERSION__},
+#endif
         {"build", BENCH_BUILD},
         {"blas", blas},
         {"numpy_version", ""},

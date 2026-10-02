@@ -14,10 +14,18 @@
 # the DLL is copied next to the program so Windows finds it. OpenCL: headers and import library from
 # $(OPENCL_SDK), else $BENCH_OPENCL_SDK, else ../deps/opencl-sdk; the driver's OpenCL.dll is used at run time.
 #
+# macOS (Apple clang, from the Xcode Command Line Tools; g++ there is clang too). OpenBLAS: $(OPENBLAS), else
+# $BENCH_OPENBLAS, else Homebrew's (brew install openblas; /opt/homebrew on Apple Silicon, /usr/local on Intel).
+# OpenCL: the system's OpenCL framework (deprecated by Apple but still shipped and working).
+#
 # Re-running make after installing either one rebuilds with it.
 
 CXX      := g++
 CXXFLAGS := -O3 -march=native -ffp-contract=off -std=c++20 -pthread
+
+ifneq ($(OS),Windows_NT)
+  UNAME := $(shell uname -s)
+endif
 
 ifeq ($(OS),Windows_NT)
   EXE := .exe
@@ -29,6 +37,11 @@ ifeq ($(OS),Windows_NT)
     OPENCL_SDK := $(if $(BENCH_OPENCL_SDK),$(subst \,/,$(BENCH_OPENCL_SDK)),../deps/opencl-sdk)
   endif
   CL_HEADER := $(wildcard $(OPENCL_SDK)/include/CL/cl.h)
+else ifeq ($(UNAME),Darwin)
+  EXE :=
+  CXX := clang++
+  OPENBLAS_CANDIDATES := /opt/homebrew/opt/openblas/lib/libopenblas.dylib /usr/local/opt/openblas/lib/libopenblas.dylib
+  CL_HEADER := $(wildcard $(shell xcrun --show-sdk-path 2>/dev/null)/System/Library/Frameworks/OpenCL.framework/Headers/cl.h)
 else
   EXE :=
   OPENBLAS_CANDIDATES := \
@@ -44,6 +57,10 @@ endif
 TARGET := common_benchmark$(EXE)
 PROBE  := hw_probe$(EXE)
 PROBE_LIBS := $(if $(EXE),,-ldl)
+ifeq ($(UNAME),Darwin)
+  PROBE_LIBS := -framework IOKit -framework CoreFoundation
+  LDLIBS     += -framework IOKit -framework CoreFoundation
+endif
 
 ifeq ($(origin OPENBLAS),undefined)
   ifneq ($(BENCH_OPENBLAS),)
@@ -70,6 +87,8 @@ ifneq ($(CL_HEADER),)
   ifeq ($(OS),Windows_NT)
     CPPFLAGS += -I$(OPENCL_SDK)/include
     LDLIBS   += $(OPENCL_SDK)/lib/OpenCL.lib
+  else ifeq ($(UNAME),Darwin)
+    LDLIBS += -framework OpenCL
   else
     LDLIBS += -l:libOpenCL.so.1
   endif
@@ -89,11 +108,11 @@ endif
 
 all: $(TARGET) $(PROBE) $(EXTRA)
 
-$(TARGET): common_benchmark.cpp Makefile .build-config
+$(TARGET): common_benchmark.cpp macos_sys.h Makefile .build-config
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ $< $(LDLIBS)
 
 # hw_probe: hardware facts for the runners' system snapshot (measured CPU clock, NVIDIA GPU memory; see hw_probe.cpp)
-$(PROBE): hw_probe.cpp Makefile
+$(PROBE): hw_probe.cpp macos_sys.h Makefile
 	$(CXX) -O2 -std=c++20 -o $@ $< $(PROBE_LIBS)
 
 # Windows: the OpenBLAS DLL next to the program (Windows looks for DLLs in the program's folder).

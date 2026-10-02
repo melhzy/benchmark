@@ -25,7 +25,9 @@ import math
 import multiprocessing
 import os
 import platform
+import re
 import statistics
+import subprocess
 import sys
 import time
 from datetime import datetime
@@ -52,10 +54,12 @@ META_KEYS = ["run_id", "batch", "language", "mode", "language_version", "build",
 
 
 # ---------------------------------------------------------------------------
-# System information (Linux: /proc and /sys; Windows: registry and Win32 API through ctypes)
+# System information (Linux: /proc and /sys; Windows: registry and Win32 API through ctypes;
+# macOS: sysctl, vm_stat, pmset and ioreg, plus Cpp/hw_probe for the temperature)
 # ---------------------------------------------------------------------------
 
 WINDOWS = sys.platform == "win32"
+MACOS = sys.platform == "darwin"
 
 
 def _read(path):
@@ -76,7 +80,27 @@ def _reg(key, value):
         return None
 
 
+def _run(*cmd):
+    """Standard output of a command, or "" if it cannot run."""
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=30).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def _sysctl(name):
+    return _run("/usr/sbin/sysctl", "-n", name)
+
+
+def _ioreg(args, key):
+    """A string property from `ioreg` output (macOS), e.g. "product-name" = <"MacBook Pro (14-inch, M5 Pro)">."""
+    m = re.search(rf'"{re.escape(key)}" = <?"([^"]*)"', _run("/usr/sbin/ioreg", *args))
+    return m.group(1).strip() if m else ""
+
+
 def cpu_model():
+    if MACOS:
+        return _sysctl("machdep.cpu.brand_string") or platform.processor()
     if WINDOWS:
         return _reg(r"HARDWARE\DESCRIPTION\System\CentralProcessor\0", "ProcessorNameString") or platform.processor()
     return (cpuinfo_field("model name") or [platform.processor()])[0]
@@ -101,12 +125,22 @@ def physical_cores():
                 cores += 1
             return cores
         return os.cpu_count()
+    if MACOS:
+        return int(_sysctl("hw.physicalcpu") or os.cpu_count())
     pairs = set(zip(cpuinfo_field("physical id"), cpuinfo_field("core id")))
     return len(pairs) or os.cpu_count()
 
 
 def meminfo_kib(key):
-    """MemTotal / MemAvailable in KiB (/proc/meminfo; Windows: GlobalMemoryStatusEx)."""
+    """MemTotal / MemAvailable in KiB (/proc/meminfo; Windows: GlobalMemoryStatusEx; macOS: hw.memsize, and
+    free + speculative + inactive pages from vm_stat)."""
+    if MACOS:
+        if key == "MemTotal":
+            return int(_sysctl("hw.memsize") or 0) // 1024
+        text = _run("/usr/bin/vm_stat")
+        page = int((re.search(r"page size of (\d+) bytes", text) or [0, 16384])[1])
+        pages = sum(int(m) for m in re.findall(r"^Pages (?:free|speculative|inactive):\s+(\d+)", text, re.M))
+        return pages * page // 1024
     if WINDOWS:
         import ctypes
 
@@ -128,6 +162,9 @@ def meminfo_kib(key):
 
 
 def power_source():
+    if MACOS:
+        text = _run("/usr/bin/pmset", "-g", "batt")
+        return "AC" if "'AC Power'" in text else "battery" if text else ""
     if WINDOWS:
         import ctypes
 
@@ -148,8 +185,19 @@ WINDOWS_POWER_MODES = {"961cc777-2547-4f9d-8174-7d86181b8a7a": "best power effic
                        "ded574b5-45a0-4f42-8737-46345c09c238": "best performance"}
 
 
+MACOS_POWER_MODES = {"0": "automatic", "1": "low power", "2": "high power"}
+
+
 def platform_profile():
-    """ACPI platform profile (Linux), or the Windows power mode for the current power source."""
+    """ACPI platform profile (Linux), or the power mode for the current power source (Windows; macOS: pmset's
+    powermode, else lowpowermode)."""
+    if MACOS:
+        text = _run("/usr/bin/pmset", "-g")
+        mode = re.search(r"^\s*powermode\s+(\d)", text, re.M)
+        if mode:
+            return MACOS_POWER_MODES.get(mode.group(1), mode.group(1))
+        low = re.search(r"^\s*lowpowermode\s+(\d)", text, re.M)
+        return ("low power" if low.group(1) == "1" else "automatic") if low else ""
     if WINDOWS:
         value = "ActiveOverlayAcPowerScheme" if power_source() == "AC" else "ActiveOverlayDcPowerScheme"
         guid = (_reg(r"SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes", value) or "").lower()
@@ -161,7 +209,12 @@ CPU_SENSORS = ("k10temp", "zenpower", "coretemp", "cpu_thermal")   # in order of
 
 
 def cpu_temp_c():
-    """CPU temperature (Linux hwmon). Windows has no sensor readable without administrator rights."""
+    """CPU temperature (Linux hwmon; macOS: the SoC die, read by Cpp/hw_probe --temp). Windows has no sensor
+    readable without administrator rights."""
+    if MACOS:
+        probe = ROOT / "Cpp" / "hw_probe"
+        text = _run(str(probe), "--temp") if probe.exists() else ""
+        return float(text) if text else None
     hwmons = sorted(Path("/sys/class/hwmon").glob("hwmon*"))
     for want in CPU_SENSORS:
         for hwmon in hwmons:
@@ -191,6 +244,9 @@ def machine_id():
     if WINDOWS:
         bios = r"HARDWARE\DESCRIPTION\System\BIOS"
         vendor, product = _reg(bios, "SystemManufacturer") or "", _reg(bios, "SystemProductName") or ""
+    elif MACOS:
+        vendor = _ioreg(["-rd1", "-c", "IOPlatformExpertDevice"], "manufacturer")
+        product = _ioreg(["-p", "IODeviceTree", "-rd1", "-n", "product"], "product-name") or _sysctl("hw.model")
     else:
         vendor, product = _read("/sys/class/dmi/id/sys_vendor") or "", _read("/sys/class/dmi/id/product_name") or ""
     v, p = slug(vendor), slug(product)
@@ -211,6 +267,9 @@ def tilde(value):
 def blas_info():
     try:
         deps = np.show_config(mode="dicts")["Build Dependencies"]["blas"]
+        known = lambda v: v not in (None, "", "unknown")
+        if not known(deps.get("openblas configuration")) and not known(deps.get("version")):
+            return f"{deps.get('name')}"     # e.g. "accelerate" (Apple's Accelerate framework, macOS wheels)
         text = deps.get("openblas configuration") or f"{deps.get('name')} {deps.get('version')}"
         return f"{deps.get('name')}: {text}"
     except Exception as exc:  # noqa: BLE001 - informational only
@@ -218,8 +277,11 @@ def blas_info():
 
 
 def blas_threads():
-    """Thread count of the OpenBLAS bundled with NumPy (falls back to the CPU count)."""
+    """Thread count of the OpenBLAS bundled with NumPy (falls back to the CPU count; on macOS NumPy's wheels use
+    Apple's Accelerate, which reports no thread count)."""
     import ctypes
+    if MACOS:
+        return os.cpu_count()
     if WINDOWS:   # NumPy's wheels keep their DLLs in site-packages/numpy.libs
         paths = {str(p) for p in (Path(np.__file__).parent.parent / "numpy.libs").glob("*openblas*.dll")}
     else:
@@ -247,7 +309,7 @@ def weyl(n, start=0, mult=PHI):
 
 # ---------------------------------------------------------------------------
 # Workloads. Each setup returns (run, check, work); run() is timed, check(result) is not.
-# Worker functions are top-level so multiprocessing (forkserver on Linux, spawn on Windows) can import them.
+# Worker functions are top-level so multiprocessing (forkserver on Linux, spawn on Windows and macOS) can import them.
 # ---------------------------------------------------------------------------
 
 def mandel_rows(span):

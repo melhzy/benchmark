@@ -88,7 +88,8 @@ header { display: grid; gap: 22px; }
 .switcher { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 10px 0; margin-bottom: -38px;
   border-bottom: 1px solid var(--hair); display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
 @media (max-width: 520px) { .switcher { margin-bottom: -30px; } }
-.switcher .lab { font-family: var(--font-data); font-size: var(--step--1); color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.cmp-pick { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin: 0 0 18px; }
+.switcher .lab, .cmp-pick .lab { font-family: var(--font-data); font-size: var(--step--1); color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
 .seg { display: inline-flex; flex-wrap: wrap; gap: 3px; padding: 3px; border: 1px solid var(--hair); border-radius: 8px; background: var(--surface); }
 .seg button { font: inherit; font-size: 0.92rem; border: 0; background: transparent; color: var(--ink-2); padding: 6px 12px; border-radius: 6px; cursor: pointer; }
 .seg button:hover { background: var(--wash); }
@@ -117,6 +118,12 @@ figcaption .t { font-weight: 650; }
 .legend i.dot { width: 10px; height: 10px; border-radius: 50%; }
 .legend i.ring { width: 10px; height: 10px; border-radius: 50%; background: transparent !important; box-shadow: inset 0 0 0 2px var(--ink-2); }
 .legend i.fill { width: 10px; height: 10px; border-radius: 50%; background: var(--ink-2) !important; }
+.legend i.square { width: 9px; height: 9px; border-radius: 1px; background: var(--ink-2) !important; }
+.legend i.diamond { width: 8px; height: 8px; border-radius: 1px; background: var(--ink-2) !important; transform: rotate(45deg); margin: 0 1px; }
+.legend i.triangle { width: 0; height: 0; border-radius: 0; background: transparent !important; border-left: 5.5px solid transparent;
+  border-right: 5.5px solid transparent; border-bottom: 10px solid var(--ink-2); }
+.subhead { display: grid; gap: 8px; margin: 34px 0 14px; }
+.subhead p { margin: 0; color: var(--ink-2); max-width: 68ch; }
 .chart { width: 100%; min-width: 0; }
 .chart svg { display: block; width: 100%; height: auto; overflow: visible; }
 .note { font-size: 0.85rem; color: var(--ink-2); }
@@ -189,17 +196,33 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
       <p id="compare-text"></p>
     </div>
     <div class="machines" id="mcards"></div>
+    <figure>
+      <figcaption><span class="t" id="cmp-all-title">Speed of each machine relative to the reference, by area</span><div class="legend" id="lg-all"></div></figcaption>
+      <p class="note" id="cmp-all-note"></p>
+      <div class="chart" id="ch-all"></div>
+      <details><summary>Show as a table</summary><div class="table-wrap" id="tb-all"></div></details>
+    </figure>
+    <figure>
+      <figcaption><span class="t">Speed relative to C++ on the same machine</span><div class="legend" id="lg-gap"></div></figcaption>
+      <p class="note">Does each language's distance from C++ depend on the computer? Each row shows one language on every machine; 1× is as fast as C++ on that machine.</p>
+      <div class="chart" id="ch-gap"></div>
+      <details><summary>Show as a table</summary><div class="table-wrap" id="tb-gap"></div></details>
+    </figure>
+    <ul class="findings" id="cmp-all-findings"></ul>
+
+    <div class="subhead">
+      <h3 id="cmp-pair-title">Two machines, test by test</h3>
+      <p id="compare-pair-text"></p>
+    </div>
+    <div class="cmp-pick" role="group" aria-label="Machine compared with the reference" id="cmp-pick" hidden>
+      <span class="lab">Compare</span>
+      <div class="seg" id="cmp-seg"></div>
+    </div>
     <div class="scores" id="cmp-scores"></div>
     <figure>
       <figcaption><span class="t" id="cmp-tests-title">Speed on one machine relative to the other, per test</span><div class="legend" id="lg-cmp"></div></figcaption>
       <div class="chart" id="ch-cmp"></div>
       <details><summary>Show as a table</summary><div class="table-wrap" id="tb-cmp"></div></details>
-    </figure>
-    <figure>
-      <figcaption><span class="t">Speed relative to C++ on the same machine</span><div class="legend" id="lg-gap"></div></figcaption>
-      <p class="note">Does each language's distance from C++ depend on the computer? Each row shows one language on both machines; 1× is as fast as C++ on that machine.</p>
-      <div class="chart" id="ch-gap"></div>
-      <details><summary>Show as a table</summary><div class="table-wrap" id="tb-gap"></div></details>
     </figure>
     <ul class="findings" id="cmp-findings"></ul>
   </section>
@@ -328,6 +351,10 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
       <p>To add a machine, clone the repository and run, on Linux:</p>
       <pre>./run_all.sh --check     # what is installed, per language
 ./run_all.sh             # full run; results go to results/&lt;machine&gt;/</pre>
+      <p>on macOS (with Homebrew and R installed):</p>
+      <pre>./setup_macos.sh         # OpenBLAS, Python packages in .venv, npm packages, R's OpenCL
+./run_all.sh --check
+./run_all.sh</pre>
       <p>or on Windows (PowerShell or cmd):</p>
       <pre>powershell -ExecutionPolicy Bypass -File setup_windows.ps1   # OpenBLAS, OpenCL SDK, packages
 .\run_all.cmd --check
@@ -538,7 +565,20 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
     f.box.replaceChildren(f.svg);
   }
 
-  // dots on one line per row: points(row) -> [{x, lang, shape: "dot" | "ring"}]; a stem joins each row's extremes
+  // one data marker: ring (open circle), dot, square, diamond or triangle, in colour c
+  function marker(g, shape, cx, cy, R, c) {
+    const solid = { style: `fill:${c}`, stroke: "var(--surface)", "stroke-width": 2, "pointer-events": "none" };
+    if (shape === "ring") return svgEl("circle", { cx, cy, r: R - 1, style: `fill:var(--surface);stroke:${c}`, "stroke-width": 2.5, "pointer-events": "none" }, g);
+    if (shape === "square") return svgEl("rect", { x: cx - R + 0.5, y: cy - R + 0.5, width: 2 * R - 1, height: 2 * R - 1, rx: 1.5, ...solid }, g);
+    if (shape === "diamond") { const d = R + 1.5; return svgEl("path", { d: `M${cx},${cy - d}L${cx + d},${cy}L${cx},${cy + d}L${cx - d},${cy}Z`, ...solid }, g); }
+    if (shape === "triangle") { const d = R + 1.5; return svgEl("path", { d: `M${cx},${cy - d}L${cx + d},${cy + d * 0.8}L${cx - d},${cy + d * 0.8}Z`, ...solid }, g); }
+    return svgEl("circle", { cx, cy, r: R, ...solid }, g);
+  }
+  // machines are told apart by marker shape (colour means language): the reference is a ring
+  const SHAPES = ["ring", "dot", "square", "diamond", "triangle"];
+  const LEGEND_SHAPE = { ring: "ring", dot: "fill", square: "square", diamond: "diamond", triangle: "triangle" };
+
+  // dots on one line per row: points(row) -> [{x, lang, shape}]; a stem joins each row's extremes
   function hdots(id, o) {
     const R = 5.5;
     const f = rowFrame(id, { ...o, rowPad: o.rowPad ?? 4 }, () => 2 * R + 4);
@@ -550,12 +590,7 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
         const xs = pts.map((p) => f.x(p.x));
         svgEl("line", { x1: Math.min(...xs), x2: Math.max(...xs), y1: cy, y2: cy, class: "stem", "pointer-events": "none" }, f.g);
       }
-      for (const p of pts) {
-        const c = col(p.lang);
-        svgEl("circle", p.shape === "ring"
-          ? { cx: f.x(p.x), cy, r: R - 1, style: `fill:var(--surface);stroke:${c}`, "stroke-width": 2.5, "pointer-events": "none" }
-          : { cx: f.x(p.x), cy, r: R, style: `fill:${c}`, stroke: "var(--surface)", "stroke-width": 2, "pointer-events": "none" }, f.g);
-      }
+      for (const p of pts) marker(f.g, p.shape, f.x(p.x), cy, R, col(p.lang));
       bindTip(it.hit, () => o.tip(it.r));
       it.hit.setAttribute("aria-label", o.ariaRow ? o.ariaRow(it.r) : it.r.label);
     }
@@ -567,7 +602,9 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
     const box = document.getElementById(id);
     const W = Math.max(280, box.clientWidth), H = o.height || 300;
     const narrow = W < 520;
-    const L = 44, R = narrow ? 70 : 96, T = 10, B = 34;
+    // right margin: room for the longest end label (about 6.6 px per character)
+    const endChars = Math.max(0, ...o.series.map((s) => { const v = s.values[s.values.length - 1]; return v == null || !o.endFmt ? 0 : o.endFmt(s, v).length; }));
+    const L = 44, R = Math.max(narrow ? 70 : 96, Math.ceil(endChars * 6.6) + 14), T = 10, B = 34;
     const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": o.aria || "" });
     const x = scale(o.xScale || "linear", o.xDomain[0], o.xDomain[1], L, W - R);
     const y = scale("linear", o.yDomain[0], o.yDomain[1], H - B, T);
@@ -630,17 +667,25 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
   }
 
   // ---------------------------------------------------------------- machine comparison
+  // With three or more machines, a second switcher picks which one is compared with the reference (default: newest).
+  let cmpOther = CMP ? CMP.others[CMP.others.length - 1] : null;
   function renderCompare() {
     if (!CMP || !document.getElementById("ch-cmp")) return;
-    const base = BY_ID[CMP.base], other = BY_ID[CMP.others[CMP.others.length - 1]];
+    const base = BY_ID[CMP.base], other = BY_ID[cmpOther];
     const name = (m) => m.T.machine_name, short = (m) => `${m.T.machine_name} (${m.T.os_family})`;
     const langs = CMP.langs;
-    document.getElementById("compare-text").textContent = CMP.text.compare_text;
+    const MS = ALL.machines.slice().sort((a, b) => (a.id === CMP.base ? -1 : b.id === CMP.base ? 1 : CMP.others.indexOf(a.id) - CMP.others.indexOf(b.id)));
+    const shapeOf = (m) => SHAPES[MS.indexOf(m) % SHAPES.length];
+    const machineLegend = (id) => {
+      const lg = document.getElementById(id); lg.replaceChildren();
+      for (const m of MS) { const s = el("span"); s.append(el("i", LEGEND_SHAPE[shapeOf(m)]), document.createTextNode(short(m))); lg.appendChild(s); }
+    };
+    document.getElementById("compare-text").textContent = CMP.text.all_text;
 
     // machine cards
     const cards = document.getElementById("mcards");
     if (!cards.children.length) {
-      for (const m of ALL.machines) {
+      for (const m of MS) {
         const c = el("div", "mcard");
         c.append(el("div", "mos", m.T.os_family), el("div", "mname", m.T.machine_name));
         const ul = el("ul");
@@ -648,6 +693,72 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
         c.appendChild(ul); cards.appendChild(c);
       }
     }
+
+    // every machine at once: speed relative to the reference, overall and per area, one row per language
+    const AREAS = ["overall", ...["cpu_single", "cpu_multi", "ram", "gpu"].filter((c) => MS.every((m) => m.categories[c]))];
+    const sp = (m, c, l) => m.id === CMP.base ? (base.overall[l] != null ? 1 : null)
+      : (c === "overall" ? CMP.overall[m.id] : (CMP.categories[m.id][c] || {}))[l];
+    const arows = [];
+    for (const c of AREAS) {
+      arows.push({ header: true, label: c === "overall" ? "Overall" : CAT[c] });
+      for (const l of langs) arows.push({ label: l, lang: l, c });
+    }
+    document.getElementById("cmp-all-title").textContent = `Speed of each machine relative to the ${name(base)}, by area`;
+    document.getElementById("cmp-all-note").textContent = `Each row is one language; each marker one machine (the ${name(base)}, the oldest results, is 1×). ` +
+      "Right of the line is faster. Areas are geometric means of their tests.";
+    machineLegend("lg-all");
+    const arange = logRange(arows.filter((r) => !r.header).flatMap((r) => MS.map((m) => sp(m, r.c, r.lang))), 2);
+    hdots("ch-all", {
+      rows: arows, scale: "log", domain: arange.domain, ticks: arange.ticks, stem: true, labelW: (n) => n ? 96 : 130, rowPad: 3,
+      tickFmt: (t) => `${+t.toPrecision(3)}×`, refs: [{ x: 1, label: "" }],
+      points: (r) => MS.map((m) => ({ x: sp(m, r.c, r.lang), lang: r.lang, shape: shapeOf(m) })),
+      aria: `Dot plot: each language's speed on every machine relative to the ${name(base)}, overall and per area`,
+      ariaRow: (r) => `${r.lang}, ${r.c === "overall" ? "overall" : CAT[r.c]}: ` + MS.map((m) => `${name(m)} ${times(sp(m, r.c, r.lang))}`).join(", "),
+      tip: (r) => ({ title: `${r.lang} · ${r.c === "overall" ? "overall" : CAT[r.c]} · relative to the ${name(base)}`,
+        rows: MS.filter((m) => sp(m, r.c, r.lang) != null).sort((a, b) => sp(b, r.c, r.lang) - sp(a, r.c, r.lang))
+          .map((m) => ({ color: col(r.lang), value: times(sp(m, r.c, r.lang)), label: short(m) })) }),
+    });
+    table("tb-all", ["Area", "Language", ...MS.map(short)],
+      arows.filter((r) => !r.header).map((r) => [r.c === "overall" ? "Overall" : CAT[r.c], r.lang, ...MS.map((m) => times(sp(m, r.c, r.lang)))]), 2);
+
+    // gap to C++ on each machine, every machine on one row per language
+    machineLegend("lg-gap");
+    const others = langs.filter((l) => l !== "C++");
+    const grows = [];
+    for (const c of [...["cpu_single", "cpu_multi", "ram", "gpu"].filter((c) => MS.every((m) => m.categories[c])), "overall"]) {
+      grows.push({ header: true, label: c === "overall" ? "Overall" : CAT[c] });
+      for (const l of others) grows.push({ label: l, lang: l, c });
+    }
+    const gv = (m, c, l) => c === "overall" ? m.overall[l] : (m.categories[c] || {})[l];
+    const grange = logRange(grows.filter((g) => !g.header).flatMap((g) => MS.map((m) => gv(m, g.c, g.lang))));
+    hdots("ch-gap", {
+      rows: grows, scale: "log", domain: grange.domain, ticks: grange.ticks, stem: true, labelW: (n) => n ? 96 : 130,
+      tickFmt: fmtX, refs: [{ x: 1, label: "" }], rowPad: 3,
+      points: (g) => MS.map((m) => ({ x: gv(m, g.c, g.lang), lang: g.lang, shape: shapeOf(m) })),
+      aria: "Dot plot: each language's speed relative to C++ on every machine",
+      ariaRow: (g) => `${g.lang}: ` + MS.map((m) => `${times(gv(m, g.c, g.lang))} on the ${name(m)}`).join(", "),
+      tip: (g) => ({ title: `${g.lang} · ${g.c === "overall" ? "overall" : CAT[g.c]} · relative to C++`,
+        rows: MS.map((m) => ({ color: col(g.lang), value: times(gv(m, g.c, g.lang)), label: short(m) })), note: "1× = as fast as C++ on the same machine" }),
+    });
+    table("tb-gap", ["Area", "Language", ...MS.map(short)],
+      grows.filter((g) => !g.header).map((g) => [g.c === "overall" ? "Overall" : CAT[g.c], g.lang, ...MS.map((m) => times(gv(m, g.c, g.lang)))]), 2);
+    document.getElementById("cmp-all-findings").innerHTML = CMP.text.all_findings;
+
+    // two machines, test by test (with three or more machines, a switch picks the one compared with the reference)
+    const CT = CMP.text.by_other[other.id];
+    document.getElementById("cmp-pair-title").textContent = `${name(other)} against ${name(base)}, test by test`;
+    document.getElementById("compare-pair-text").textContent = CT.compare_text;
+    const pick = document.getElementById("cmp-seg");
+    if (CMP.others.length > 1 && !pick.children.length) {
+      for (const id of CMP.others) {
+        const b = el("button", null, `${BY_ID[id].T.machine_name} vs ${name(base)}`);
+        b.type = "button"; b.dataset.id = id;
+        b.addEventListener("click", () => { cmpOther = id; renderCompare(); });
+        pick.appendChild(b);
+      }
+      document.getElementById("cmp-pick").hidden = false;
+    }
+    for (const b of pick.children) b.setAttribute("aria-pressed", String(b.dataset.id === other.id));
 
     // headline: how much faster each language is on the other machine
     const ov = CMP.overall[other.id];
@@ -686,33 +797,7 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
     });
     table("tb-cmp", ["Test", ...langs], CMP.tests.map((t) => [t.test, ...langs.map((l) => times(r(t, l)))]));
 
-    // gap to C++ on each machine: a ring for the reference machine, a filled dot for the other, joined by a stem
-    const lg = document.getElementById("lg-gap");
-    lg.replaceChildren();
-    const sw = (cls, txt) => { const s = el("span"); s.append(el("i", cls), document.createTextNode(txt)); return s; };
-    lg.append(sw("ring", short(base)), sw("fill", short(other)));
-    const others = langs.filter((l) => l !== "C++");
-    const grows = [];
-    for (const c of [...["cpu_single", "cpu_multi", "ram", "gpu"].filter((c) => base.categories[c] && other.categories[c]), "overall"]) {
-      grows.push({ header: true, label: c === "overall" ? "Overall" : CAT[c] });
-      for (const l of others) grows.push({ label: l, lang: l, c });
-    }
-    const gv = (m, c, l) => c === "overall" ? m.overall[l] : (m.categories[c] || {})[l];
-    const grange = logRange(grows.filter((g) => !g.header).flatMap((g) => [gv(base, g.c, g.lang), gv(other, g.c, g.lang)]));
-    hdots("ch-gap", {
-      rows: grows, scale: "log", domain: grange.domain, ticks: grange.ticks, stem: true, labelW: (n) => n ? 96 : 130,
-      tickFmt: fmtX, refs: [{ x: 1, label: "" }], rowPad: 3,
-      points: (g) => [{ x: gv(base, g.c, g.lang), lang: g.lang, shape: "ring" }, { x: gv(other, g.c, g.lang), lang: g.lang, shape: "dot" }],
-      aria: "Dumbbell chart: each language's speed relative to C++ on each machine",
-      ariaRow: (g) => `${g.lang}: ${times(gv(base, g.c, g.lang))} on the ${name(base)}, ${times(gv(other, g.c, g.lang))} on the ${name(other)}`,
-      tip: (g) => ({ title: `${g.lang} · ${g.c === "overall" ? "overall" : CAT[g.c]} · relative to C++`,
-        rows: [{ color: col(g.lang), value: times(gv(base, g.c, g.lang)), label: short(base) },
-               { color: col(g.lang), value: times(gv(other, g.c, g.lang)), label: short(other) }], note: "1× = as fast as C++ on the same machine" }),
-    });
-    table("tb-gap", ["Area", "Language", short(base), short(other)],
-      grows.filter((g) => !g.header).map((g) => [g.c === "overall" ? "Overall" : CAT[g.c], g.lang, times(gv(base, g.c, g.lang)), times(gv(other, g.c, g.lang))]), 2);
-
-    document.getElementById("cmp-findings").innerHTML = CMP.text.compare_findings;
+    document.getElementById("cmp-findings").innerHTML = CT.compare_findings;
   }
 
   // ---------------------------------------------------------------- one machine
@@ -740,8 +825,9 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
                el("div", "cap", l === "C++" ? "the reference" : "of C++ speed overall"));
       scores.appendChild(c);
     }
+    const dates = ALL.machines.map((m) => `${m.T.date_text} (${m.T.machine_name})`);
     document.getElementById("foot-dates").textContent = "Results from " +
-      ALL.machines.map((m) => `${m.T.date_text} (${m.T.machine_name})`).join(" and ");
+      (dates.length > 1 ? `${dates.slice(0, -1).join(", ")} and ${dates[dates.length - 1]}` : dates[0]);
   }
 
   function renderMachine() {
@@ -872,9 +958,13 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
 
     // share of peak
     legend("lg-util", LANGS);
+    // a share above 100% (e.g. a compiler that skips work; see the GPU text) widens the axis and marks 100% as the peak
+    const utilTop = Math.max(100, ...D.util.flatMap((u) => Object.values(u.pct).filter((v) => v != null)));
     hbars("ch-util", {
       rows: D.util.map((u) => ({ label: u.name.split(" (")[0], sub: u.name.includes("(") ? u.name.split(" (")[1].replace(")", "") : "", u })),
-      series: LANGS, scale: "linear", domain: [0, 100], ticks: [0, 25, 50, 75, 100], tickFmt: (t) => `${t}%`, barH: 9,
+      series: LANGS, scale: "linear", domain: [0, utilTop > 100 ? utilTop * 1.12 : 100],
+      ticks: utilTop > 100 ? niceTicks(utilTop, 4) : [0, 25, 50, 75, 100], refs: utilTop > 100 ? [{ x: 100, label: "peak" }] : [],
+      tickFmt: (t) => `${t}%`, barH: 9,
       labelW: (n) => n ? 120 : 200, get: (r, l) => r.u.pct[l], valFmt: (v) => `${v < 1 ? nf3.format(v) : Math.round(v)}%`,
       aria: "Bar chart: share of theoretical peak reached by each language",
       tip: (r) => ({ title: r.u.name, rows: LANGS.map((l) => ({ color: col(l), value: r.u.pct[l] == null ? "–" : `${nf3.format(r.u.pct[l])}%`, label: l })), note: `peak ${nf0.format(r.u.peak)} ${r.u.unit}` }),
@@ -889,20 +979,28 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
     const s = D.sensors, box = document.getElementById("ch-heat");
     document.getElementById("heat-batch").textContent = `run ${s.batch}`;
     const temps = s.cpu_temp.filter((v) => v != null), mhz = s.cpu_mhz.filter((v) => v != null);
-    document.getElementById("heat-caption").textContent = temps.length ? "CPU temperature and average clock, by language" : "Average CPU clock, by language";
+    // macOS logs no clocks (they need administrator rights): the GPU's load is shown in their place.
+    const gpuD = s.gpu_busy.some((v) => v > 0);
+    document.getElementById("heat-caption").textContent = mhz.length
+      ? (temps.length ? "CPU temperature and average clock, by language" : "Average CPU clock, by language")
+      : (temps.length ? "Chip temperature" + (gpuD ? " and GPU load" : "") + ", by language" : "GPU load, by language");
     const W = Math.max(280, box.clientWidth), narrow = W < 520;
     const L = narrow ? 42 : 52, R = 12, T0 = 22, gapY = 26, pH = narrow ? 120 : 150, B = 30;
     const panels = [];
     if (temps.length) {
       const tempD = [Math.min(40, Math.floor((Math.min(...temps) - 5) / 20) * 20), Math.max(105, Math.max(...temps) + 5)];
-      panels.push({ key: "cpu_temp", d: tempD, ticks: [20, 40, 60, 80, 100].filter((v) => v >= tempD[0] && v <= tempD[1]), fmt: (v) => `${v}°`, label: "CPU °C" });
+      panels.push({ key: "cpu_temp", d: tempD, ticks: [20, 40, 60, 80, 100].filter((v) => v >= tempD[0] && v <= tempD[1]), fmt: (v) => `${v}°`, label: mhz.length ? "CPU °C" : "Chip °C" });
     }
-    const mhzTop = Math.max(...mhz) * 1.08;
-    panels.push({ key: "cpu_mhz", d: [0, mhzTop], ticks: niceTicks(mhzTop / 1000 * 0.95, 4).map((v) => v * 1000).filter((v) => v > 0), fmt: (v) => `${v / 1000}`, label: "GHz, avg" });
+    if (mhz.length) {
+      const mhzTop = Math.max(...mhz) * 1.08;
+      panels.push({ key: "cpu_mhz", d: [0, mhzTop], ticks: niceTicks(mhzTop / 1000 * 0.95, 4).map((v) => v * 1000).filter((v) => v > 0), fmt: (v) => `${v / 1000}`, label: "GHz, avg" });
+    } else if (gpuD || !temps.length) {
+      panels.push({ key: "gpu_busy", d: [0, 105], ticks: [25, 50, 75, 100], fmt: (v) => `${v}%`, label: "GPU busy" });
+    }
     panels.forEach((p, i) => { p.y0 = T0 + i * (pH + gapY); });
     const spanH = panels.length * pH + (panels.length - 1) * gapY;
     const H = T0 + spanH + B;
-    const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": `Line chart${panels.length > 1 ? "s" : ""}: ${temps.length ? "CPU temperature and " : ""}average clock speed over one full run` });
+    const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": `Line chart${panels.length > 1 ? "s" : ""}: ${panels.map((p) => p.label).join(" and ")} over one full run` });
     const tMax = s.t[s.t.length - 1];
     const x = scale("linear", 0, tMax, L, W - R);
     const PH = { cpp: "C++", python: "Python", r: "R", js: "JavaScript" };
@@ -944,9 +1042,9 @@ footer { border-top: 1px solid var(--hair); padding-top: 18px; color: var(--mute
       cross.setAttribute("x1", x(s.t[idx])); cross.setAttribute("x2", x(s.t[idx])); cross.setAttribute("visibility", "visible");
       const who = PH[s.phase[idx]] || "between languages";
       const rows = [];
-      if (temps.length) rows.push({ value: `${nf3.format(s.cpu_temp[idx])} °C`, label: "CPU temperature" });
-      rows.push({ value: `${(s.cpu_mhz[idx] / 1000).toFixed(2)} GHz`, label: "CPU clock, average" },
-                { value: `${s.gpu_busy[idx]}%`, label: "GPU busy" }, { value: `${nf3.format(s.ram[idx])} GiB`, label: "RAM in use" });
+      if (temps.length) rows.push({ value: `${nf3.format(s.cpu_temp[idx])} °C`, label: mhz.length ? "CPU temperature" : "Chip temperature" });
+      if (mhz.length) rows.push({ value: `${(s.cpu_mhz[idx] / 1000).toFixed(2)} GHz`, label: "CPU clock, average" });
+      rows.push({ value: `${s.gpu_busy[idx]}%`, label: "GPU busy" }, { value: `${nf3.format(s.ram[idx])} GiB`, label: "RAM in use" });
       return { title: `${Math.floor(s.t[idx] / 60)}:${String(Math.round(s.t[idx] % 60)).padStart(2, "0")} · ${who}`,
         rows: rows.map((r) => ({ ...r, color: PH[s.phase[idx]] ? col(PH[s.phase[idx]]) : "var(--ink-2)" })) };
     };

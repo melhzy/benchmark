@@ -1,0 +1,28 @@
+key,value
+run_id,python_20261001-214214
+batch,20261001-214149
+language,Python
+mode,full
+language_version,CPython 3.14.7
+build,~/Documents/GitHub/benchmark/.venv/bin/python
+blas,accelerate
+numpy_version,2.5.3
+cpu,Apple M5 Pro
+physical_cores,15
+logical_cpus,15
+ram_gib,24.0
+power,AC
+platform_profile,automatic
+cpu_temp_start_c,52.3
+cpu_temp_end_c,54.0
+started,2026-10-01T21:42:14
+elapsed_s,29.903
+host,apple-inc-macbook-pro-14-inch-m5-pro
+machine,apple-inc-macbook-pro-14-inch-m5-pro
+gpu_platform,Apple (OpenCL 1.2 (Apr 18 2026 19:20:04))
+gpu_device,Apple M5 Pro
+gpu_compute_units,16
+gpu_max_clock_mhz,1000
+gpu_driver,1.2 1.0
+skipped,mem_alloc 4 GiB: larger than 40% of MemAvailable (5.5 GiB); mem_alloc 8 GiB: larger than 40% of MemAvailable (5.5 GiB); mem_alloc 16 GiB: larger than 40% of MemAvailable (5.5 GiB)
+failed,

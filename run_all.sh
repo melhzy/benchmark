@@ -12,7 +12,9 @@
 #   ./run_all.sh --cool 55             wait until the CPU is below 55 C before each language (default 60)
 #   ./run_all.sh --out DIR             results directory (default: results/<machine>/)
 #
-# Environment: BENCH_PYTHON (Python to use; default: python3 on PATH), BENCH_GPU (choose an OpenCL GPU
+# Linux and macOS (on Windows use run_all.cmd).
+# Environment: BENCH_PYTHON (Python to use; default: .venv/bin/python if present, else python3 on PATH),
+# BENCH_GPU (choose an OpenCL GPU
 # by part of its name), BENCH_GPU_POWER (JavaScript/WebGPU: high-performance or low-power),
 # BENCH_OPENBLAS (full path to libopenblas, if it isn't found automatically).
 #
@@ -34,29 +36,45 @@ while [[ $# -gt 0 ]]; do
     --machine) BENCH_MACHINE="$2"; shift ;;
     --cool)    COOL="$2"; shift ;;
     --out)     OUT="$2"; shift ;;
-    -h|--help) sed -n '2,23p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown option: $1 (see --help)" >&2; exit 2 ;;
   esac
   shift
 done
 
 # --------------------------------------------------------------------------- machine identity
-# Same rule as the four programs (common/SPEC.md): BENCH_MACHINE, else the DMI vendor + product name,
-# else the hostname; lower-case, runs of other characters replaced by "-".
+# Same rule as the four programs (common/SPEC.md): BENCH_MACHINE, else the DMI vendor + product name (macOS: the
+# IORegistry's manufacturer and model name), else the hostname; lower-case, runs of other characters replaced by "-".
 slugify() { tr '[:upper:]' '[:lower:]' <<< "$1" | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//'; }
 trim() { sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//' <<< "$1"; }
 read1() { [[ -r "$1" ]] && head -n1 "$1" 2>/dev/null || true; }
+MACOS=0; [[ "$(uname -s)" == Darwin ]] && MACOS=1
+TILDE="~"   # (written "$TILDE" in replacements: macOS's bash 3.2 would keep the backslash of \~)
+ioreg_str() { /usr/sbin/ioreg "${@:2}" 2>/dev/null | sed -nE "s/.*\"$1\" = <?\"([^\"]*)\".*/\1/p" | head -1; }
+if (( MACOS )); then
+  FW_VENDOR="$(ioreg_str manufacturer -rd1 -c IOPlatformExpertDevice)"
+  FW_PRODUCT="$(ioreg_str product-name -p IODeviceTree -rd1 -n product)"
+  FW_PRODUCT="${FW_PRODUCT:-$(sysctl -n hw.model)}"
+else
+  FW_VENDOR="$(trim "$(read1 /sys/class/dmi/id/sys_vendor)")"
+  FW_PRODUCT="$(trim "$(read1 /sys/class/dmi/id/product_name)")"
+fi
 
 if [[ -n "${BENCH_MACHINE:-}" ]]; then
   BENCH_MACHINE="$(slugify "$BENCH_MACHINE")"
 else
-  model="$(trim "$(trim "$(read1 /sys/class/dmi/id/sys_vendor)") $(trim "$(read1 /sys/class/dmi/id/product_name)")")"
-  BENCH_MACHINE="$(slugify "${model:-$(hostname)}")"
+  v="$(slugify "$FW_VENDOR")" p="$(slugify "$FW_PRODUCT")"
+  if [[ -n "$v" && ( "$p" == "$v" || "$p" == "$v"-* ) ]]; then BENCH_MACHINE="$p"
+  else BENCH_MACHINE="$(slugify "$(trim "$FW_VENDOR $FW_PRODUCT")")"; fi
+  BENCH_MACHINE="${BENCH_MACHINE:-$(slugify "$(hostname)")}"
 fi
 export BENCH_MACHINE
 OUT="${OUT:-$ROOT/results/$BENCH_MACHINE}"
 
-PYTHON="${BENCH_PYTHON:-$(command -v python3 || true)}"
+# Python: BENCH_PYTHON, else the repository's virtual environment (setup_macos.sh creates it), else python3 on PATH.
+if [[ -n "${BENCH_PYTHON:-}" ]]; then PYTHON="$BENCH_PYTHON"
+elif [[ -x "$ROOT/.venv/bin/python" ]]; then PYTHON="$ROOT/.venv/bin/python"
+else PYTHON="$(command -v python3 || true)"; fi
 export RUSTICL_ENABLE="${RUSTICL_ENABLE:-radeonsi,iris}"   # let Mesa's rusticl expose AMD and Intel GPUs
 
 # Node.js 20 or newer: the one on PATH if it is new enough, else the newest from nvm (which is only on PATH in
@@ -75,7 +93,8 @@ find_node() {
 
 OPENBLAS_CANDIDATES=(/usr/lib/x86_64-linux-gnu/openblas-pthread/libopenblas.so.0
   /usr/lib/x86_64-linux-gnu/libopenblas.so.0 /usr/lib/aarch64-linux-gnu/openblas-pthread/libopenblas.so.0
-  /usr/lib64/libopenblasp.so.0 /usr/lib64/libopenblas.so.0 /usr/lib/libopenblas.so.0 /usr/lib/libopenblas.so)
+  /usr/lib64/libopenblasp.so.0 /usr/lib64/libopenblas.so.0 /usr/lib/libopenblas.so.0 /usr/lib/libopenblas.so
+  /opt/homebrew/opt/openblas/lib/libopenblas.dylib /usr/local/opt/openblas/lib/libopenblas.dylib)
 find_openblas() {
   [[ -n "${BENCH_OPENBLAS:-}" ]] && { echo "$BENCH_OPENBLAS"; return; }
   local f; for f in "${OPENBLAS_CANDIDATES[@]}"; do [[ -e "$f" ]] && { echo "$f"; return; }; done
@@ -95,25 +114,42 @@ CPU_HWMON="$(hwmon_by_name k10temp zenpower coretemp cpu_thermal)"
 GPU_HWMON="$(hwmon_by_name amdgpu)"
 GPU_DEV="$(dirname "$(ls -d /sys/class/drm/card*/device/gpu_busy_percent 2>/dev/null | head -1)" 2>/dev/null || true)"
 NVSMI="$(command -v nvidia-smi || true)"
-cpu_temp() { [[ -n "$CPU_HWMON" ]] && echo $(( $(cat "$CPU_HWMON/temp1_input") / 1000 )) || echo 0; }
+# macOS has no hwmon: Cpp/hw_probe reads the SoC die temperature, the GPU load and the memory in use (IOKit).
+PROBE="$ROOT/Cpp/hw_probe"
+have_temp() { [[ -n "$CPU_HWMON" ]] || { (( MACOS )) && [[ -n "$("$PROBE" --temp 2>/dev/null)" ]]; }; }
+cpu_temp() {
+  if [[ -n "$CPU_HWMON" ]]; then echo $(( $(cat "$CPU_HWMON/temp1_input") / 1000 ))
+  elif (( MACOS )); then "$PROBE" --temp 2>/dev/null | awk '{printf "%d\n", $1} END {if (!NR) print 0}'
+  else echo 0; fi
+}
 
 # --------------------------------------------------------------------------- --check
 if (( CHECK )); then
   ok()   { printf "  %-34s %s\n" "$1" "$2"; }
   have() { "$@" >/dev/null 2>&1 && echo yes || echo "NO"; }
   echo "Machine: $BENCH_MACHINE"
-  echo "C++";        ok "g++" "$(g++ --version 2>/dev/null | head -1 || echo 'NOT FOUND (install g++ make)')"
+  if (( MACOS )); then
+    echo "C++";      ok "clang++" "$(clang++ --version 2>/dev/null | head -1 || echo 'NOT FOUND (xcode-select --install)')"
+                     ok "OpenBLAS" "$(find_openblas || true)"; [[ -z "$(find_openblas || true)" ]] && ok "" "NOT FOUND - brew install openblas (matmul_blas will be skipped)"
+                     ok "OpenCL framework" "$( [[ -f "$(xcrun --show-sdk-path 2>/dev/null)/System/Library/Frameworks/OpenCL.framework/Headers/cl.h" ]] && echo yes || echo 'NO - xcode-select --install')"
+  else
+    echo "C++";      ok "g++" "$(g++ --version 2>/dev/null | head -1 || echo 'NOT FOUND (install g++ make)')"
                      ok "OpenBLAS" "$(find_openblas || true)"; [[ -z "$(find_openblas || true)" ]] && ok "" "NOT FOUND - install libopenblas (matmul_blas will be skipped)"
                      ok "OpenCL headers (CL/cl.h)" "$( [[ -f /usr/include/CL/cl.h ]] && echo yes || echo 'NO - install opencl-headers ocl-icd-opencl-dev')"
+  fi
   echo "Python";     ok "interpreter" "${PYTHON:-NOT FOUND} $([[ -n "$PYTHON" ]] && "$PYTHON" -c 'import sys; print(sys.version.split()[0])' 2>/dev/null)"
                      for m in numpy pyopencl pandas matplotlib jupyterlab; do ok "  $m" "$([[ -n "$PYTHON" ]] && have "$PYTHON" -c "import $m" || echo NO)"; done
   echo "R";          ok "Rscript" "$(command -v Rscript >/dev/null && Rscript --version 2>&1 | head -1 || echo 'NOT FOUND (install r-base)')"
                      ok "  OpenCL package" "$(have Rscript -e 'stopifnot(requireNamespace("OpenCL", quietly = TRUE))')"
   echo "JavaScript"; NODE="$(find_node || true)"; ok "node" "${NODE:-NOT FOUND (install Node.js 20 or newer, e.g. with nvm)} $([[ -n "$NODE" ]] && "$NODE" --version)"
                      for m in webgpu koffi; do ok "  npm $m" "$([[ -d "$ROOT/JavaScript/node_modules/$m" ]] && echo yes || echo 'NO - run npm install in JavaScript/')"; done
-  echo "GPU";        ok "OpenCL devices" "$(command -v clinfo >/dev/null && clinfo -l 2>/dev/null | sed -n 's/.*Device #[0-9]*: //p' | paste -sd ';' || echo 'clinfo not installed')"
-  echo "Sensors";    ok "CPU temperature" "${CPU_HWMON:-none found}"
+  echo "GPU";        ok "OpenCL devices" "$(command -v clinfo >/dev/null && clinfo -l 2>/dev/null | sed -n 's/.*Device #[0-9]*: //p' | paste -sd ';' - || echo 'clinfo not installed')"
+  if (( MACOS )); then
+    echo "Sensors";  ok "SoC temperature, GPU load" "$( [[ -x "$PROBE" ]] && echo "Cpp/hw_probe (now $("$PROBE" --temp) C)" || echo 'Cpp/hw_probe (built by the first run, or: make -C Cpp)')"
+  else
+    echo "Sensors";  ok "CPU temperature" "${CPU_HWMON:-none found}"
                      ok "GPU sensors" "$( [[ -n "$GPU_HWMON" ]] && echo "amdgpu ($GPU_HWMON)" || { [[ -n "$NVSMI" ]] && echo nvidia-smi || echo none; })"
+  fi
   exit 0
 fi
 
@@ -127,7 +163,7 @@ ARGS=(--out "$OUT")
 # The C++ program and hw_probe (hardware facts for the snapshot below) are built first.
 echo "Batch $BENCH_BATCH   machine: $BENCH_MACHINE   mode: ${MODE_ARG:---full}   languages: $LANGS"
 echo "Results: $OUT"
-echo "Python:  ${PYTHON/#$HOME/\~}"
+echo "Python:  ${PYTHON/#$HOME/$TILDE}"
 echo "Building C++..."
 make -s -C "$ROOT/Cpp" || echo "C++ build failed"
 
@@ -136,13 +172,14 @@ make -s -C "$ROOT/Cpp" || echo "C++ build failed"
 # what the kernel does not report: per-type core counts and clocks of a hybrid CPU (measured on one busy core
 # of each type) and an NVIDIA GPU's memory bus (from the CUDA driver).
 write_system() {
+  (( MACOS )) && { write_system_macos; return; }
   local f="$OUT/system_${BENCH_BATCH}.csv" udev="" k probe="" rated
   command -v udevadm >/dev/null && udev="$(udevadm info -p /sys/devices/virtual/dmi/id 2>/dev/null || true)"
   udev_val() { sed -n "s/^E: $1=//p" <<< "$udev" | head -1; }
   [[ -x "$ROOT/Cpp/hw_probe" ]] && { echo "Measuring CPU clocks (hw_probe)..."; probe="$("$ROOT/Cpp/hw_probe" 2>/dev/null || true)"; }
   probe_val() { sed -n "s/^$1=//p" <<< "$probe" | head -1; }
   rated="$(awk '{printf "%.0f", $1/1000}' /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq 2>/dev/null || true)"
-  kv() { local v="${2//\"/\"\"}"; printf '%s,"%s"\n' "$1" "${v//$HOME/\~}"; }
+  kv() { local v="${2//\"/\"\"}"; printf '%s,"%s"\n' "$1" "${v//$HOME/$TILDE}"; }
   {
     echo "key,value"
     kv batch "$BENCH_BATCH"; kv machine "$BENCH_MACHINE"; kv mode "$( [[ -n "$MODE_ARG" ]] && echo "${MODE_ARG#--}" || echo full)"; kv date "$(date -Iseconds)"
@@ -158,15 +195,15 @@ write_system() {
     kv physical_cores "$(awk -F: '/^physical id/{p=$2} /^core id/{print p "-" $2}' /proc/cpuinfo | sort -u | wc -l)"
     kv logical_cpus "$(nproc)"
     kv smt "$(read1 /sys/devices/system/cpu/smt/active)"
-    kv cpu_flags "$(grep -m1 -oE '\b(sse4_2|avx|avx2|fma|avx512f|avx512_bf16|amx_tile|asimd|sve)\b' /proc/cpuinfo | sort -u | paste -sd ' ')"
+    kv cpu_flags "$(grep -m1 -oE '\b(sse4_2|avx|avx2|fma|avx512f|avx512_bf16|amx_tile|asimd|sve)\b' /proc/cpuinfo | sort -u | paste -sd ' ' -)"
     kv l3_cache "$(read1 /sys/devices/system/cpu/cpu0/cache/index3/size)"
     kv ram_gib "$(awk '/^MemTotal/{printf "%.1f", $2/1048576}' /proc/meminfo)"
     kv ram_type "$(udev_val MEMORY_DEVICE_0_TYPE)"
     kv ram_speed_mts "$(udev_val MEMORY_DEVICE_0_CONFIGURED_SPEED_MTS)"
     kv ram_modules "$(grep -cE '^E: MEMORY_DEVICE_[0-9]+_SIZE=' <<< "$udev" || true)"
     kv ram_module_sizes_gib "$(sed -n 's/^E: MEMORY_DEVICE_[0-9]*_SIZE=//p' <<< "$udev" | awk '{printf "%s%g", sep, $1/2^30; sep=" "}')"
-    kv gpus "$(lspci 2>/dev/null | grep -iE 'vga|3d controller|display' | sed -E 's/^[^ ]+ [^:]+: //' | paste -sd ';')"
-    kv opencl_devices "$(command -v clinfo >/dev/null && clinfo -l 2>/dev/null | sed -n 's/.*Device #[0-9]*: //p' | paste -sd ';')"
+    kv gpus "$(lspci 2>/dev/null | grep -iE 'vga|3d controller|display' | sed -E 's/^[^ ]+ [^:]+: //' | paste -sd ';' -)"
+    kv opencl_devices "$(command -v clinfo >/dev/null && clinfo -l 2>/dev/null | sed -n 's/.*Device #[0-9]*: //p' | paste -sd ';' -)"
     for k in gpu_cuda_name gpu_sm_count gpu_boost_clock_mhz gpu_memory_clock_mhz gpu_memory_bus_bits gpu_memory_gbs; do
       if [[ -n "$(probe_val $k)" ]]; then kv $k "$(probe_val $k)"; fi
     done
@@ -175,6 +212,59 @@ write_system() {
     kv governor "$(read1 /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)"
     kv epp "$(read1 /sys/devices/system/cpu/cpu0/cpufreq/energy_performance_preference)"
     kv transparent_hugepages "$(sed -nE 's/.*\[([a-z]+)\].*/\1/p' /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null)"
+    kv python "${PYTHON:-}"; kv node "$(find_node || true)"; kv openblas "$(find_openblas || true)"
+    for k in BENCH_GPU BENCH_GPU_POWER RUSTICL_ENABLE; do kv "env_$k" "${!k:-}"; done
+  } > "$f"
+}
+# macOS: the same keys from sysctl, sw_vers, system_profiler (RAM type, GPU), pmset and hw_probe (measured clocks,
+# GPU cores and the GPU's highest clock from its DVFS table). RAM speed and bus width are not reported by macOS;
+# results/<machine>/hardware.csv can add them from Apple's specifications.
+mac_chassis() {   # (a function: bash 3.2 cannot parse a case statement inside $(...))
+  case "$FW_PRODUCT" in *Book*) echo laptop ;; *Mac*) echo desktop ;; esac
+}
+write_system_macos() {
+  local f="$OUT/system_${BENCH_BATCH}.csv" k probe="" mem gpu flags=""
+  [[ -x "$PROBE" ]] && { echo "Measuring CPU clocks (hw_probe)..."; probe="$("$PROBE" 2>/dev/null || true)"; }
+  probe_val() { sed -n "s/^$1=//p" <<< "$probe" | head -1; }
+  kv() { local v="${2//\"/\"\"}"; printf '%s,"%s"\n' "$1" "${v//$HOME/$TILDE}"; }
+  mem="$(system_profiler SPMemoryDataType 2>/dev/null)"
+  gpu="$(system_profiler SPDisplaysDataType 2>/dev/null)"
+  for k in neon:asimd FEAT_FHM:fhm FEAT_BF16:bf16 FEAT_I8MM:i8mm FEAT_SME:sme FEAT_SME2:sme2; do
+    [[ "$(sysctl -n "hw.optional.${k%%:*}" 2>/dev/null || sysctl -n "hw.optional.arm.${k%%:*}" 2>/dev/null)" == 1 ]] && flags+=" ${k#*:}"
+  done
+  {
+    echo "key,value"
+    kv batch "$BENCH_BATCH"; kv machine "$BENCH_MACHINE"; kv mode "$( [[ -n "$MODE_ARG" ]] && echo "${MODE_ARG#--}" || echo full)"; kv date "$(date -Iseconds)"
+    kv suite_commit "$(git -C "$ROOT" describe --always --dirty 2>/dev/null || echo none)"
+    kv suite_tests_sha "$(cat "$ROOT"/common/tests.csv "$ROOT"/common/kernels.cl "$ROOT"/common/kernels.wgsl | shasum -a 256 | cut -c1-12)"
+    kv vendor "$FW_VENDOR"; kv product "$FW_PRODUCT"; kv model_id "$(sysctl -n hw.model)"
+    kv chassis "$(mac_chassis)"
+    kv os "macOS $(sw_vers -productVersion)"; kv kernel "$(uname -r)"; kv arch "$(uname -m)"
+    kv cpu "$(sysctl -n machdep.cpu.brand_string)"
+    kv cpu_max_mhz "$(probe_val cpu_max_mhz)"
+    kv cpu_max_mhz_source "$( [[ -n "$(probe_val cpu_max_mhz)" ]] && echo 'measured by hw_probe on one busy core')"
+    for k in cpu_e_max_mhz performance_cores efficiency_cores performance_core_name efficiency_core_name; do
+      if [[ -n "$(probe_val $k)" ]]; then kv $k "$(probe_val $k)"; fi
+    done
+    kv physical_cores "$(sysctl -n hw.physicalcpu)"
+    kv logical_cpus "$(sysctl -n hw.logicalcpu)"
+    kv smt "$( [[ "$(sysctl -n hw.physicalcpu)" == "$(sysctl -n hw.logicalcpu)" ]] && echo 0 || echo 1)"
+    kv cpu_flags "${flags# }"
+    kv l2_cache "$(awk '{printf "%gM", $1/1048576}' <<< "$(sysctl -n hw.perflevel0.l2cachesize 2>/dev/null || sysctl -n hw.l2cachesize)")"
+    kv l3_cache "$(sysctl -n hw.l3cachesize 2>/dev/null | awk '$1 > 0 {printf "%gM", $1/1048576}')"
+    kv ram_gib "$(sysctl -n hw.memsize | awk '{printf "%.1f", $1/1073741824}')"
+    kv ram_type "$(sed -n 's/^ *Type: //p' <<< "$mem" | head -1)"
+    kv ram_speed_mts ""
+    kv ram_modules ""
+    kv ram_module_sizes_gib ""
+    kv gpus "$(sed -n 's/^ *Chipset Model: //p' <<< "$gpu" | paste -sd ';' -)"
+    kv opencl_devices "$(command -v clinfo >/dev/null && clinfo -l 2>/dev/null | sed -n 's/.*Device #[0-9]*: //p' | paste -sd ';' -)"
+    for k in gpu_cores gpu_max_clock_mhz; do if [[ -n "$(probe_val $k)" ]]; then kv $k "$(probe_val $k)"; fi; done
+    kv power "$(pmset -g batt 2>/dev/null | grep -q "'AC Power'" && echo AC || echo battery)"
+    kv platform_profile "$(pmset -g 2>/dev/null | awk '$1 == "powermode" {m = $2} $1 == "lowpowermode" && m == "" {l = $2}
+                           END {if (m != "") print (m == 1 ? "low power" : m == 2 ? "high power" : "automatic");
+                                else if (l != "") print (l == 1 ? "low power" : "automatic")}')"
+    kv governor ""; kv epp ""; kv transparent_hugepages ""
     kv python "${PYTHON:-}"; kv node "$(find_node || true)"; kv openblas "$(find_openblas || true)"
     for k in BENCH_GPU BENCH_GPU_POWER RUSTICL_ENABLE; do kv "env_$k" "${!k:-}"; done
   } > "$f"
@@ -190,6 +280,11 @@ sensor_loop() {
   while true; do
     local t ct mhz gt="" gb="" gs="" mem
     t="$(date +%s.%N)"
+    if (( MACOS )); then   # hw_probe --sample: SoC temperature, GPU load, RAM in use (no clocks without root)
+      IFS=, read -r ct gb mem < <("$PROBE" --sample 2>/dev/null || echo ",,")
+      echo "$t,$(cat "$PHASE_FILE"),$ct,,,,$gb,,$mem"
+      sleep 1; continue
+    fi
     ct="$([[ -n "$CPU_HWMON" ]] && awk '{printf "%.1f", $1/1000}' "$CPU_HWMON/temp1_input")"
     mhz="$(awk -F: '/^cpu MHz/{s+=$2; n++; if ($2>m) m=$2} END{if (n) printf "%.0f,%.0f", s/n, m; else printf ","}' /proc/cpuinfo)"
     if [[ -n "$GPU_HWMON" || -n "$GPU_DEV" ]]; then
@@ -207,11 +302,12 @@ sensor_loop() {
 }
 sensor_loop > "$SENSORS" &
 SENSOR_PID=$!
-cleanup() { kill "$SENSOR_PID" 2>/dev/null || true; rm -f "$PHASE_FILE"; }
+cleanup() { kill "$SENSOR_PID" 2>/dev/null || true; wait "$SENSOR_PID" 2>/dev/null || true; rm -f "$PHASE_FILE"; }
 trap cleanup EXIT
 
 cool_down() {
-  [[ "$MODE_ARG" == "--verify" || -z "$CPU_HWMON" ]] && return
+  [[ "$MODE_ARG" == "--verify" ]] && return
+  have_temp || return 0
   local waited=0
   while (( $(cpu_temp) >= COOL && waited < 300 )); do
     (( waited == 0 )) && printf "Cooling down to below %s C (now %s C)..." "$COOL" "$(cpu_temp)"

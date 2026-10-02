@@ -15,7 +15,8 @@ Files:
 | `Python/common_benchmark.py` | Python implementation (NumPy + pyopencl) |
 | `R/common_benchmark.R` | R implementation |
 | `JavaScript/common_benchmark.mjs` (+ `package.json`) | JavaScript implementation (Node.js) |
-| `run_all.sh` | runs all four on Linux |
+| `run_all.sh` | runs all four on Linux and macOS |
+| `setup_macos.sh`, `Cpp/macos_sys.h` | macOS setup; macOS system facts for the C++ programs |
 | `run_all.ps1` (+ `run_all.cmd`), `setup_windows.ps1`, `common/windows_tools.ps1` | the same on Windows, and its setup |
 | `results/` | output of every run (shared by all languages) |
 
@@ -43,15 +44,17 @@ vendor and product name, otherwise the hostname, made into a *slug*: lower-cased
 characters other than `[a-z0-9]` replaced by `-` and leading/trailing `-` removed. Vendor and product
 come from `/sys/class/dmi/id/sys_vendor` and `/sys/class/dmi/id/product_name` on Linux, and from the
 registry key `HKLM\HARDWARE\DESCRIPTION\System\BIOS` (`SystemManufacturer`, `SystemProductName`) on
-Windows. The id is slug(vendor + " " + product), except that when slug(product) equals slug(vendor) or
+Windows, and from the IORegistry on macOS: vendor = `manufacturer` of `IOPlatformExpertDevice`, product =
+`product-name` of `IODeviceTree:/product` (Apple Silicon; else `sysctl hw.model`). The id is slug(vendor + " " + product), except that when slug(product) equals slug(vendor) or
 starts with slug(vendor) + "-", it is slug(product) alone. Examples: `dell-inc-inspiron-14-7425-2-in-1`
-("Dell Inc." + "Inspiron 14 7425 2-in-1") and `alienware-m16-r1` ("Alienware" + "Alienware m16 R1").
+("Dell Inc." + "Inspiron 14 7425 2-in-1"), `alienware-m16-r1` ("Alienware" + "Alienware m16 R1") and
+`apple-inc-macbook-pro-14-inch-m5-pro` ("Apple Inc." + "MacBook Pro (14-inch, M5 Pro)").
 
 | variable | effect |
 |---|---|
 | `BENCH_MACHINE` | machine id / results folder (`run_all.sh --machine NAME` sets it) |
 | `BENCH_BATCH` | batch id shared by one `run_all.sh` invocation |
-| `BENCH_PYTHON` | Python interpreter the runner uses (default: `python3` on `PATH`; Windows: `python`, else the `py` launcher) |
+| `BENCH_PYTHON` | Python interpreter the runner uses (default: `.venv/bin/python` if it exists, else `python3` on `PATH`; Windows: `python`, else the `py` launcher) |
 | `BENCH_RSCRIPT` | Windows: `Rscript.exe` to use (default: on `PATH`, else the newest R in the registry / Program Files) |
 | `BENCH_GPU` | OpenCL (C++, Python, R): use the first GPU whose name contains this text (case-insensitive); none matches → GPU tests skipped, listing the devices |
 | `BENCH_GPU_POWER` | JavaScript/WebGPU: `high-performance` or `low-power` adapter preference |
@@ -62,7 +65,8 @@ starts with slug(vendor) + "-", it is slug(product) alone. Examples: `dell-inc-i
 OpenBLAS is searched (C++ at build time, JavaScript at run time) in this order:
 `/usr/lib/x86_64-linux-gnu/openblas-pthread/libopenblas.so.0`, `/usr/lib/x86_64-linux-gnu/libopenblas.so.0`,
 `/usr/lib/aarch64-linux-gnu/openblas-pthread/libopenblas.so.0`, `/usr/lib64/libopenblasp.so.0`,
-`/usr/lib64/libopenblas.so.0`, `/usr/lib/libopenblas.so.0`, `/usr/lib/libopenblas.so`; on Windows:
+`/usr/lib64/libopenblas.so.0`, `/usr/lib/libopenblas.so.0`, `/usr/lib/libopenblas.so`; on macOS (Homebrew):
+`/opt/homebrew/opt/openblas/lib/libopenblas.dylib`, `/usr/local/opt/openblas/lib/libopenblas.dylib`; on Windows:
 `deps\openblas\bin\libopenblas.dll` (installed by `setup_windows.ps1`), `C:\OpenBLAS\bin\libopenblas.dll`,
 `C:\msys64\ucrt64\bin\libopenblas.dll`, `C:\msys64\mingw64\bin\libopenblas.dll`. If none exists,
 `matmul_blas` is skipped with the reason.
@@ -144,17 +148,25 @@ skipped, failed
   Windows: `cpu` = registry `HKLM\HARDWARE\DESCRIPTION\System\CentralProcessor\0\ProcessorNameString`;
   `physical_cores` = processor cores from `GetLogicalProcessorInformationEx` (R: `detectCores(logical = FALSE)`,
   which is right on Windows; JavaScript: the sum of `NumberOfCores` of `Win32_Processor`).
+  macOS: `cpu` = `sysctl machdep.cpu.brand_string`, `physical_cores` = `sysctl hw.physicalcpu`.
 - `power`: `AC` or `battery` (any `/sys/class/power_supply/*/online` == 1 → AC; Windows: the AC line
-  status from `GetSystemPowerStatus`, or AC when there is no battery).
+  status from `GetSystemPowerStatus`, or AC when there is no battery; macOS: the providing power source,
+  `pmset -g batt` "Now drawing from 'AC Power'", or IOKit's `IOPSGetProvidingPowerSourceType` in C++).
 - `platform_profile`: `/sys/firmware/acpi/platform_profile`; Windows: the power mode for the current
   power source (registry `...\Control\Power\User\PowerSchemes`, `ActiveOverlayAcPowerScheme` /
-  `ActiveOverlayDcPowerScheme`), written as `best power efficiency`, `balanced` or `best performance`.
+  `ActiveOverlayDcPowerScheme`), written as `best power efficiency`, `balanced` or `best performance`;
+  macOS: the power mode of the current power source from `pmset -g` (`powermode` 0 / 1 / 2 → `automatic`,
+  `low power`, `high power`; on Macs without High Power mode `lowpowermode` 0 / 1 → `automatic`, `low power`).
 - CPU temperature: `temp1_input` / 1000 of the first hwmon whose `name` is, in this order of
   preference, `k10temp`, `zenpower`, `coretemp`, `cpu_thermal`. Windows offers no CPU temperature
-  to programs without administrator rights: the values are empty there.
+  to programs without administrator rights: the values are empty there. macOS: the hottest of the SoC die
+  sensors (`PMU tdie*`, IOHID event system, no administrator rights needed), read by `Cpp/hw_probe --temp`
+  (empty if hw_probe is not built; Intel Macs have no such sensors).
 - `MemAvailable` (used by `mem_alloc`) and `ram_gib`: `/proc/meminfo`; Windows: `GlobalMemoryStatusEx`
   (`ullAvailPhys`, `ullTotalPhys`), or the equivalent `Win32_OperatingSystem` values (R) and
-  `os.freemem()` / `os.totalmem()` (JavaScript).
+  `os.freemem()` / `os.totalmem()` (JavaScript). macOS: total = `sysctl hw.memsize`; available = free +
+  speculative + inactive pages of `vm_stat` × its page size (C++: `free_count + inactive_count` of
+  `host_statistics64`, the same numbers).
 - `skipped`: `;`-separated `test: reason` items (e.g. GPU missing, size too big for RAM).
 
 **Files written by the runner** (`run_all.sh`, or `run_all.ps1` on Windows; not by the programs), in
@@ -167,14 +179,22 @@ the same folder:
   (from `udevadm`, no root needed), GPUs (`lspci`), OpenCL devices, power source and profile, governor,
   transparent huge pages, tool paths. Windows fills the same keys from CIM and the registry (RAM type and
   speed from `Win32_PhysicalMemory`, the power mode as above, `governor` = the power plan) and adds
-  `cpu_base_mhz`. Both runners then add what **`Cpp/hw_probe`** (built with the C++ program) reports:
+  `cpu_base_mhz`. macOS fills them from `sysctl`, `sw_vers`, `system_profiler` (RAM type, GPU name) and `pmset`,
+  adds `model_id` (`hw.model`) and `l2_cache`, and leaves the RAM speed and modules empty (macOS does not report
+  them); `cpu_flags` lists the Arm features `asimd fhm bf16 i8mm sme sme2` that `hw.optional` reports. The
+  runners then add what **`Cpp/hw_probe`** (built with the C++ program) reports:
   `cpu_flags` (Windows), on hybrid CPUs `performance_cores` / `efficiency_cores` and `cpu_e_max_mhz`,
   `cpu_max_mhz` where the OS does not report it (Windows; Linux without cpufreq) with
   `cpu_max_mhz_source`, and for an NVIDIA GPU `gpu_cuda_name`, `gpu_sm_count`, `gpu_boost_clock_mhz`,
   `gpu_memory_clock_mhz`, `gpu_memory_bus_bits` and `gpu_memory_gbs` (= 2 × memory clock × bus width / 8,
-  from the CUDA driver that comes with NVIDIA's driver). hw_probe *measures* a core's clock: a chain of
-  dependent register-to-register additions (one cycle each) on a thread pinned to one core of each type,
-  best of 25 samples after 0.3 s of load. After the run, `gpu_clock_max_logged_mhz` = the highest GPU
+  from the CUDA driver that comes with NVIDIA's driver); on a Mac `performance_cores` / `efficiency_cores` are
+  `hw.perflevel0` / `hw.perflevel1` (with Apple's names in `performance_core_name` / `efficiency_core_name`),
+  and `gpu_cores` (IORegistry `AGXAccelerator`) and `gpu_max_clock_mhz` (the highest entry of the GPU's DVFS
+  table, `voltage-states9` of the `pmgr` device; Apple's OpenCL reports a fixed 1000 MHz). hw_probe *measures*
+  a core's clock: a chain of dependent register-to-register additions (one cycle each) on a thread pinned to
+  one core of each type, best of 25 samples after 0.3 s of load. macOS cannot pin threads: a user-interactive
+  thread measures the fastest core type, and the other type is measured by one more such thread than there are
+  fastest cores, all at once (the slowest of them is reported). After the run, `gpu_clock_max_logged_mhz` = the highest GPU
   clock in the sensor log is appended. The notebook and the results page compute each machine's
   theoretical peaks from this file, taking the highest measured clocks over all of a machine's snapshots
   (a measured boost clock depends on the load at that moment), and for the GPU the higher of the driver's
@@ -182,7 +202,10 @@ the same folder:
 - `sensors_<batch>.csv`: one row per second — phase (language running), CPU temperature and clocks,
   GPU temperature/load/clock (amdgpu sysfs, or `nvidia-smi` on NVIDIA), RAM in use. On Windows the
   clocks are the effective clock (base clock × the `% Processor Performance` counter, as Task Manager
-  shows it) and the temperature column is empty.
+  shows it) and the temperature column is empty. On macOS (`hw_probe --sample`) the temperature is the SoC's
+  (as above), the GPU load is `Device Utilization %` of the `AGXAccelerator` performance statistics, RAM in use
+  = total − available, and the clock columns and the GPU temperature are empty (macOS reports clocks only to
+  administrators).
 
 **Optional, written by hand: `hardware.csv`** (`key,value,source`) — corrections that override
 `system_<batch>.csv` when peaks are computed (any of its keys, e.g. `gpu_memory_gbs` for a discrete
@@ -294,7 +317,8 @@ C++: `std::thread` workers pulling chunk indices from an atomic counter; Python:
 JavaScript: a pool of `worker_threads` created and warmed up before timing (like Python), chunk
 indices handed to whichever worker is free;
 R: `parallel::mclapply(mc.cores = workers)` (R forks inside the call, so its start-up **is**
-included — that is how R works). Windows cannot fork: there Python's pool starts its workers with
+included — that is how R works; Linux and macOS). Python's pool uses the platform's default start method
+(*forkserver* on Linux with Python 3.14, *spawn* on macOS). Windows cannot fork: there Python's pool starts its workers with
 *spawn* (still not timed), and R uses a socket cluster (`makeCluster(workers)`, `mandel_rows`
 exported, one call to every worker) created before timing, then times
 `parLapplyLB(chunk.size = 1)`. threads = workers, work = W*W (px),
@@ -357,12 +381,17 @@ GPU's power state rather than on the language. (Integrated GPUs are unaffected: 
 the AMD iGPU, measured before this rule, have identical times in every repetition.)
 
 **JavaScript (WebGPU)**: Node.js has no maintained OpenCL binding, so it uses the npm package
-`webgpu` (Google's Dawn: Vulkan backend on Linux, Direct3D 12 on Windows) and `common/kernels.wgsl`, a line-by-line
+`webgpu` (Google's Dawn: Vulkan backend on Linux, Direct3D 12 on Windows, Metal on macOS) and `common/kernels.wgsl`, a line-by-line
 translation of `kernels.cl` (differences listed at the top of that file). Timed kernel launch =
 encode + `queue.submit` + `await queue.onSubmittedWorkDone()`. Upload = `queue.writeBuffer` +
 `await onSubmittedWorkDone()`. Download = `copyBufferToBuffer` into a `MAP_READ` buffer +
 `mapAsync` + copying the mapped range into a host `Float32Array`. Request the adapter's
-maximum buffer limits so the full sizes fit. GPU meta values come from `adapter.info`.
+maximum buffer limits so the full sizes fit. GPU meta values come from `adapter.info`. On macOS, Dawn compiles
+WGSL for Metal with `#pragma METAL fp math_mode(relaxed)` (no toggle turns it off), which allows the shader
+compiler to reassociate: it merges the two multiply-adds per chain and round of `fma_peak`, so JavaScript's
+`gpu_fp32_peak` there does about half the arithmetic, runs about 2× as fast as the OpenCL languages (above the
+theoretical peak) and has a slightly different check value. The results are kept as measured; the results page
+and the notebook point this out.
 
 **gpu_fp32_peak** (size n work-items) — kernel `fma_peak`, global size n, output n floats.
 work = n·1024·32 FLOP (1024 loop rounds × 16 multiply-adds × 2), check = out[0] read after timing.
@@ -397,8 +426,12 @@ work = S·2^20 bytes, check = first element read (= 2.5).
   Python for loop, hashmap and string_ops; `multiprocessing` for parallel; `pyopencl` for GPU.
 - **R**: base R (+ `parallel`); the CRAN package `OpenCL` for GPU. Loop tests run inside
   functions so R byte-compiles them.
-- **Platform**: Linux (the programs read `/proc` and `/sys`) and Windows 10/11 x64 (registry and Win32
-  API; `run_all.ps1`). Windows C++ build: MinGW-w64 g++ (e.g. from Rtools) with the same flags plus
+- **Platform**: Linux (the programs read `/proc` and `/sys`), macOS (Apple Silicon or Intel: `sysctl`,
+  `vm_stat`, `pmset`, `ioreg`, and IOKit in C++; `run_all.sh`) and Windows 10/11 x64 (registry and Win32
+  API; `run_all.ps1`). macOS C++ build: Apple clang (`clang++`) with the same flags, linked to Homebrew's
+  OpenBLAS and the system `OpenCL.framework` (deprecated by Apple but shipped and working, OpenCL 1.2).
+  NumPy's macOS wheels use Apple's Accelerate for BLAS (`blas` = `accelerate`); R for macOS uses its reference
+  BLAS (`libRblas.0.dylib`, one thread) unless switched to Apple's vecLib. Windows C++ build: MinGW-w64 g++ (e.g. from Rtools) with the same flags plus
   `-Wa,-muse-unaligned-vector-move` (GCC cannot align the Windows stack to 32 bytes, so AVX spills must
   use unaligned moves), linked to the OpenBLAS DLL (copied next to the program) and to the OpenCL SDK's
   import library; the GPU driver's `OpenCL.dll` is used at run time. R for Windows uses its bundled

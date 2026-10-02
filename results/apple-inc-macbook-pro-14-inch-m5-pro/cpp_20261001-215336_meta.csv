@@ -1,0 +1,28 @@
+key,value
+run_id,cpp_20261001-215336
+batch,20261001-215334
+language,C++
+mode,full
+language_version,clang++ Apple LLVM 21.0.0 (clang-2100.1.1.101)
+build,clang++ -O3 -march=native -ffp-contract=off -std=c++20 -pthread
+blas,OpenBLAS 0.3.34 DYNAMIC_ARCH NO_AFFINITY USE_OPENMP vortexm4 MAX_THREADS=56
+numpy_version,
+cpu,Apple M5 Pro
+physical_cores,15
+logical_cpus,15
+ram_gib,24
+power,AC
+platform_profile,automatic
+cpu_temp_start_c,58.9
+cpu_temp_end_c,58.6
+started,2026-10-01T21:53:36
+elapsed_s,22.1237
+host,apple-inc-macbook-pro-14-inch-m5-pro
+machine,apple-inc-macbook-pro-14-inch-m5-pro
+gpu_platform,Apple
+gpu_device,Apple M5 Pro
+gpu_compute_units,16
+gpu_max_clock_mhz,1000
+gpu_driver,1.2 1.0
+skipped,mem_alloc 4 GiB: more than 40% of available RAM; mem_alloc 8 GiB: more than 40% of available RAM; mem_alloc 16 GiB: more than 40% of available RAM
+failed,

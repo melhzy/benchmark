@@ -1,0 +1,4 @@
+key,value,source
+ram_type,LPDDR5X,"Low End Mac, Apple Silicon - M5 Pro chip specs (lowendmac.com/2026/apple-silicon-m5-pro-chip-specs); macOS reports only LPDDR5"
+ram_speed_mts,9600,"Low End Mac (as above): LPDDR5X-9600; consistent with Apple's 307 GB/s (apple.com/macbook-pro/specs) on a 256-bit bus"
+ram_bus_bits,256,"Low End Mac (as above): 256-bit memory bus; 9600 MT/s x 256 bit / 8 = 307.2 GB/s, Apple's figure"

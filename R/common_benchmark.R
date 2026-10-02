@@ -34,6 +34,16 @@ file_arg   <- grep("^--file=", commandArgs(FALSE), value = TRUE)
 script_dir <- if (length(file_arg)) dirname(normalizePath(sub("^--file=", "", file_arg[1]))) else getwd()
 root       <- dirname(script_dir)
 windows    <- .Platform$OS.type == "windows"
+macos      <- Sys.info()[["sysname"]] == "Darwin"
+run_cmd <- function(cmd, args = character()) {   # standard output of a command, or character() if it cannot run
+  out <- tryCatch(suppressWarnings(system2(cmd, args, stdout = TRUE, stderr = FALSE)), error = function(e) character())
+  if (!is.null(attr(out, "status"))) character() else out
+}
+sysctl <- function(name) { v <- run_cmd("/usr/sbin/sysctl", c("-n", name)); if (length(v)) trimws(v[1]) else "" }
+ioreg_string <- function(args, key) {   # e.g. "product-name" = <"MacBook Pro (14-inch, M5 Pro)">
+  line <- grep(sprintf('"%s" = <?"', key), run_cmd("/usr/sbin/ioreg", args), value = TRUE, fixed = FALSE)
+  if (length(line)) trimws(sub(sprintf('.*"%s" = <?"([^"]*)".*', key), "\\1", line[1])) else ""
+}
 reg <- function(key, value) {          # a string under HKEY_LOCAL_MACHINE (Windows), or ""
   v <- tryCatch(suppressWarnings(utils::readRegistry(key, "HLM"))[[value]], error = function(e) NULL)
   if (is.null(v)) "" else trimws(as.character(v))
@@ -45,6 +55,11 @@ slug <- function(x) gsub("^-+|-+$", "", gsub("[^a-z0-9]+", "-", tolower(x)))
 read_dmi <- function(f) {
   if (windows) return(reg("HARDWARE\\DESCRIPTION\\System\\BIOS",
                           c(sys_vendor = "SystemManufacturer", product_name = "SystemProductName")[[f]]))
+  if (macos) {
+    if (f == "sys_vendor") return(ioreg_string(c("-rd1", "-c", "IOPlatformExpertDevice"), "manufacturer"))
+    p <- ioreg_string(c("-p", "IODeviceTree", "-rd1", "-n", "product"), "product-name")
+    return(if (nzchar(p)) p else sysctl("hw.model"))
+  }
   v <- tryCatch(readLines(file.path("/sys/class/dmi/id", f), n = 1, warn = FALSE), error = function(e) "")
   if (length(v)) trimws(v) else ""
 }
@@ -76,8 +91,14 @@ kernels_path <- file.path(root, "common", "kernels.cl")
 
 # ---------------------------------------------------------------- system information
 # Linux: /proc and /sys. Windows: the registry, detectCores() (correct on Windows) and one PowerShell query.
+# macOS: sysctl, vm_stat and pmset; the temperature from Cpp/hw_probe --temp (the SoC die).
 read1 <- function(path) tryCatch(readLines(path, n = 1, warn = FALSE), error = function(e) NA_character_)
 cpu_temp <- function() {   # first hwmon sensor of a known CPU driver, in order of preference
+  if (macos) {
+    probe <- file.path(root, "Cpp", "hw_probe")
+    v <- if (file.exists(probe)) run_cmd(probe, "--temp") else character()
+    return(if (length(v)) as.numeric(v[1]) else NA_real_)
+  }
   hwmons <- Sys.glob("/sys/class/hwmon/hwmon*")   # (none on Windows: no CPU sensor without admin rights)
   for (want in c("k10temp", "zenpower", "coretemp", "cpu_thermal"))
     for (h in hwmons)
@@ -106,6 +127,23 @@ if (windows) {
   overlay <- tolower(reg("SYSTEM\\CurrentControlSet\\Control\\Power\\User\\PowerSchemes",
                          if (on_ac) "ActiveOverlayAcPowerScheme" else "ActiveOverlayDcPowerScheme"))
   profile <- if (overlay %in% names(modes)) modes[[overlay]] else overlay
+} else if (macos) {
+  cpuinfo <- character()
+  field <- function(key) if (key == "model name") sysctl("machdep.cpu.brand_string") else character()
+  phys_cores <- as.integer(sysctl("hw.physicalcpu"))
+  meminfo_kb <- function(key) {   # MemTotal = hw.memsize; MemAvailable = free + speculative + inactive pages (vm_stat)
+    if (key == "MemTotal") return(as.numeric(sysctl("hw.memsize")) / 1024)
+    vm <- run_cmd("/usr/bin/vm_stat")
+    page <- as.numeric(sub(".*page size of ([0-9]+) bytes.*", "\\1", vm[1]))
+    pages <- grep("^Pages (free|speculative|inactive):", vm, value = TRUE)
+    sum(as.numeric(gsub("[^0-9]", "", sub("^[^:]*:", "", pages)))) * page / 1024
+  }
+  on_ac <- any(grepl("'AC Power'", run_cmd("/usr/bin/pmset", c("-g", "batt")), fixed = TRUE))
+  pm <- run_cmd("/usr/bin/pmset", "-g")
+  pmv <- function(key) { l <- grep(sprintf("^\\s*%s\\s+[0-9]", key), pm, value = TRUE); if (length(l)) sub(".*\\s([0-9]+).*", "\\1", l[1]) else "" }
+  modes <- c("0" = "automatic", "1" = "low power", "2" = "high power")
+  profile <- if (pmv("powermode") %in% names(modes)) modes[[pmv("powermode")]] else
+             if (nzchar(pmv("lowpowermode"))) (if (pmv("lowpowermode") == "1") "low power" else "automatic") else pmv("powermode")
 } else {
   cpuinfo <- readLines("/proc/cpuinfo")
   field <- function(key) trimws(sub("^[^:]*:", "", grep(paste0("^", key, "\\s*:"), cpuinfo, value = TRUE)))
@@ -121,7 +159,9 @@ logical_cpus <- detectCores()
 blas_path <- sessionInfo()$BLAS
 # R on Windows ships its own reference BLAS (Rblas.dll), which sessionInfo() does not name.
 if (windows && !nzchar(blas_path)) blas_path <- normalizePath(file.path(R.home("bin"), "Rblas.dll"), mustWork = FALSE)
-blas_threads <- if (grepl("openblas", blas_path, ignore.case = TRUE)) {
+# R for macOS (CRAN) uses its reference BLAS, libRblas.0.dylib, unless switched to Apple's vecLib (Accelerate).
+blas_threads <- if (grepl("veclib|accelerate", blas_path, ignore.case = TRUE)) logical_cpus else
+                if (grepl("openblas", blas_path, ignore.case = TRUE)) {
   env <- Sys.getenv(c("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS"))
   env <- suppressWarnings(as.integer(env[nzchar(env)]))
   if (length(env) && !is.na(env[1])) env[1] else logical_cpus

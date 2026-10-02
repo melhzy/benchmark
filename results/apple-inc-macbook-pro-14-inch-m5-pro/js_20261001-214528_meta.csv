@@ -1,0 +1,28 @@
+key,value
+run_id,js_20261001-214528
+batch,20261001-214149
+language,JavaScript
+mode,full
+language_version,Node.js v25.9.0 (V8 14.1.146.11-node.25)
+build,/opt/homebrew/Cellar/node/25.9.0_2/bin/node --expose-gc
+blas,OpenBLAS 0.3.34 DYNAMIC_ARCH NO_AFFINITY USE_OPENMP vortexm4 MAX_THREADS=56 (via koffi 3.3.2)
+numpy_version,
+cpu,Apple M5 Pro
+physical_cores,15
+logical_cpus,15
+ram_gib,24.0
+power,AC
+platform_profile,automatic
+cpu_temp_start_c,58.6
+cpu_temp_end_c,62
+started,2026-10-01T21:45:28
+elapsed_s,31.612
+host,apple-inc-macbook-pro-14-inch-m5-pro
+machine,apple-inc-macbook-pro-14-inch-m5-pro
+gpu_platform,"WebGPU (npm webgpu 0.6.1, Dawn, Metal)"
+gpu_device,apple-m5-pro
+gpu_compute_units,
+gpu_max_clock_mhz,
+gpu_driver,Metal driver on macOS Version 26.5.2 (Build 25F84)
+skipped,mem_alloc 4: larger than 40% of MemAvailable (6.1 GiB); mem_alloc 8: larger than 40% of MemAvailable (6.1 GiB); mem_alloc 16: larger than 40% of MemAvailable (6.1 GiB)
+failed,

@@ -4,15 +4,24 @@
 // Prints key=value lines (keys are left out when unknown):
 //   cpu_flags                               instruction-set extensions (x86): sse4_2 avx avx2 fma avx512f
 //   performance_cores, efficiency_cores     hybrid CPUs only: physical cores of each type
+//   performance_core_name,                  macOS: Apple's names of the two core types (e.g. Super and Performance
+//   efficiency_core_name                    on the M5 Pro, Performance and Efficiency before it)
 //   cpu_max_mhz, cpu_e_max_mhz              clock measured on one busy core (of each type, on a hybrid CPU)
 //   gpu_cuda_name, gpu_sm_count,            NVIDIA GPUs, from the CUDA driver (nvcuda.dll / libcuda.so.1, part of
 //   gpu_boost_clock_mhz,                    the NVIDIA driver): rated boost clock, memory clock and bus width,
 //   gpu_memory_clock_mhz,                   and the memory bandwidth they give (2 transfers per clock x bus
 //   gpu_memory_bus_bits, gpu_memory_gbs     width; the formula of NVIDIA's deviceQuery sample)
+//   gpu_cores, gpu_max_clock_mhz            Apple GPUs: core count and the highest clock of the GPU's DVFS table
 //
 // The clock is measured, not read: a chain of dependent register-to-register additions (one cycle each on every
 // x86 and ARM core) runs on a thread pinned to the core; additions per second = cycles per second. (Adding an
-// immediate would not work: recent Intel P-cores fold chains of those in the register renamer.)
+// immediate would not work: recent Intel P-cores fold chains of those in the register renamer.) macOS cannot pin
+// a thread to a core: a user-interactive thread runs on the fastest core type, and the other type is measured
+// with one more such thread than there are fastest cores, all at once; the slowest of them ran on the other type.
+// (Background threads, which macOS keeps on the other type, run at a capped clock, so they cannot be used.)
+//
+//   hw_probe --sample   (macOS) one sensor sample for run_all.sh: cpu_temp_c,gpu_busy_pct,mem_used_gib
+//   hw_probe --temp     (macOS) the SoC temperature alone (the benchmark programs' cpu_temp_start_c / _end_c)
 
 #include <algorithm>
 #include <chrono>
@@ -38,6 +47,12 @@
 #include <sched.h>
 #include <fstream>
 #include <sstream>
+#endif
+#ifdef __APPLE__
+#include <pthread.h>
+#include <pthread/qos.h>
+#include <thread>
+#include "macos_sys.h"
 #endif
 
 // ---------------------------------------------------------------------------------------------- CPU clock
@@ -105,6 +120,35 @@ static bool pin_to(const std::string& pin) {
     return SetThreadGroupAffinity(GetCurrentThread(), &ga, nullptr);
 }
 
+#elif defined(__APPLE__)
+
+// Apple Silicon: hw.perflevel0 = the fastest core type, hw.perflevel1 = the other one. Only the fastest type can
+// be "pinned" (pin = "interactive"); the other is measured by slowest_of_crowd().
+static std::vector<CoreType> core_types() {
+    std::vector<CoreType> types;
+    long long levels = macos::sysctl_int("hw.nperflevels", 1);
+    for (long long l = levels - 1; l >= 0; --l) {
+        std::string key = "hw.perflevel" + std::to_string(l) + ".physicalcpu";
+        types.push_back({(int)macos::sysctl_int(key.c_str(), 0), l == 0 ? "interactive" : ""});
+    }
+    if (types.empty() || !types.back().cores) types = {{(int)macos::sysctl_int("hw.physicalcpu", 0), "interactive"}};
+    return types;
+}
+
+static bool pin_to(const std::string& pin) {
+    return pin == "interactive" && pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0) == 0;
+}
+
+// `threads` user-interactive threads measure at the same time; the clock of the slowest one, in GHz.
+static double slowest_of_crowd(int threads) {
+    std::vector<double> ghz(threads);
+    std::vector<std::thread> pool;
+    for (int i = 0; i < threads; ++i)
+        pool.emplace_back([&ghz, i] { pin_to("interactive"); ghz[i] = add_chain_ghz(); });
+    for (auto& t : pool) t.join();
+    return *std::min_element(ghz.begin(), ghz.end());
+}
+
 #else  // Linux
 
 static std::string read_line(const std::string& path) {
@@ -156,6 +200,9 @@ static bool pin_to(const std::string& pin) {
 // ---------------------------------------------------------------------------------------------- NVIDIA GPU
 
 static void cuda_facts() {
+#ifdef __APPLE__
+    return;   // no NVIDIA GPUs (and no CUDA driver) on current Macs
+#endif
 #ifdef _WIN32
     HMODULE lib = LoadLibraryA("nvcuda.dll");
     auto sym = [&](const char* n) { return lib ? (void*)GetProcAddress(lib, n) : nullptr; };
@@ -201,7 +248,28 @@ static void cuda_facts() {
     if (mem_khz && bus) std::printf("gpu_memory_gbs=%.1f\n", 2.0 * mem_khz * 1e3 * bus / 8 / 1e9);
 }
 
-int main() {
+#ifdef __APPLE__
+static int sample(bool temp_only) {
+    double t = macos::soc_temp_c();
+    char temp[32] = "";
+    if (t > -100) std::snprintf(temp, sizeof temp, "%.1f", t);
+    if (temp_only) {
+        if (*temp) std::printf("%s\n", temp);
+        return 0;
+    }
+    int busy = macos::gpu_busy_pct();
+    double used = (double)macos::sysctl_int("hw.memsize") - macos::ram_available_bytes();
+    std::printf("%s,%s,%.2f\n", temp, busy >= 0 ? std::to_string(busy).c_str() : "", used / 1073741824.0);
+    return 0;
+}
+#endif
+
+int main(int argc, char** argv) {
+    std::string arg = argc > 1 ? argv[1] : "";
+#ifdef __APPLE__
+    if (arg == "--sample" || arg == "--temp") return sample(arg == "--temp");
+#endif
+    if (!arg.empty()) return 0;   // --sample / --temp: nothing to report on this platform
 #if defined(__x86_64__) || defined(__i386__)
     __builtin_cpu_init();
     std::string flags;   // (__builtin_cpu_supports takes string literals only)
@@ -215,13 +283,23 @@ int main() {
     std::vector<CoreType> types = core_types();   // lowest (efficiency) class first
     if (types.size() > 1) {
         std::printf("performance_cores=%d\nefficiency_cores=%d\n", types.back().cores, types.front().cores);
+#ifdef __APPLE__
+        std::printf("performance_core_name=%s\nefficiency_core_name=%s\n", macos::sysctl_str("hw.perflevel0.name").c_str(),
+                    macos::sysctl_str("hw.perflevel1.name").c_str());
+        std::printf("cpu_e_max_mhz=%.0f\n", slowest_of_crowd(types.back().cores + 1) * 1000);
+#else
         if (pin_to(types.front().pin)) std::printf("cpu_e_max_mhz=%.0f\n", add_chain_ghz() * 1000);
+#endif
     }
     if (pin_to(types.back().pin)) {
         double ghz = add_chain_ghz();
         if (ghz > 0) std::printf("cpu_max_mhz=%.0f\n", ghz * 1000);
     }
     std::fflush(stdout);
+#ifdef __APPLE__
+    if (int cores = macos::gpu_cores()) std::printf("gpu_cores=%d\n", cores);
+    if (double mhz = macos::gpu_max_clock_mhz()) std::printf("gpu_max_clock_mhz=%.0f\n", mhz);
+#endif
     cuda_facts();
     return 0;
 }
