@@ -4,3 +4,5 @@
 *.cmd text eol=crlf
 *.png binary
 *.ipynb text eol=lf
+# Result files are kept byte for byte as each program wrote them (Python's csv module and R on Windows write CRLF).
+results/** -text
